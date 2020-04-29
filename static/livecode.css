@@ -16,7 +16,7 @@ h1, h2, h3, h4, h5, h6 {
   box-sizing: border-box;
   border: 1px black solid;
   font-size: 20px;
-  height: auto;
+  height: 100%;
   width: 100%;
 }
 
@@ -31,7 +31,7 @@ button {
   box-shadow: 4px 4px rgb(200, 200, 200);
   font-size: 20px;
   height: 50px;
-  margin: 10px 10px 10px 0;
+  /* margin: 0 10px 10px 0; */
 }
 
 button:hover {
@@ -128,22 +128,26 @@ button.stop.down {
 }
 
 #main {
+  display: grid;
+  grid-template-columns: 5fr 1fr 2fr;
 }
 
+/* Hack. */
+.CodeMirror-sizer {
+  margin-bottom: 0 !important;
+}
+
+
 #editor {
-  width: 65%;
   display: inline-block;
 }
 
 #controls {
-  width: 15%;
   display: inline-block;
 }
 
 #scopes {
-  width: 15%;
   display: inline-block;
-  margin-left: 2vw;
   font-size: 12px;
 }
 
@@ -165,19 +169,4 @@ canvas {
   top: 0;
   margin: 0;
   padding: 0;
-}
-
-.controls div,
-.controls input {
-  display: inline-flex;
-  padding: 0;
-}
-
-.controls div {
-  margin: 0 5px;
-  min-width: 15px;
-}
-
-.controls input {
-  margin: 0 10px;
 }

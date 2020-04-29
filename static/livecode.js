@@ -4,6 +4,7 @@ import { Scope } from "./Scope.js";
 
 let audio;
 let customNodes = {};
+let codeViews = {};
 let CustomAudioNode;
 let analyser;
 let processorCount = 0;
@@ -165,7 +166,8 @@ function createEditor() {
     lineNumbers: false,
     lint: { esversion: 6 },
     viewportMargin: Infinity,
-    tabSize: 2
+    tabSize: 2,
+    scrollbarStyle: null
   });
 
   document.addEventListener("keydown", event => {
@@ -218,8 +220,10 @@ function createViewer(id, code) {
     lint: { esversion: 6 },
     viewportMargin: Infinity,
     tabSize: 2,
-    readOnly: true
+    readOnly: true,
+    scrollbarStyle: null,
   });
+  codeViews[id] = editor;
   child.appendChild(view);
   parent.appendChild(child);
 };
@@ -287,10 +291,11 @@ function main() {
         console.log('leave', id)
         stopAudio(id);
         document.getElementById(`p${id}-container`).remove();
+        delete codeViews[id];
       });
 
       socket.on('code', ({id, code}) => {
-        document.getElementById(`p${id}-code`).value = code;
+        codeViews[id].getDoc().setValue(code);
         runCode(id, code);
       })
   });
