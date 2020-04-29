@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>kilobeat</title>
+  <script src="lib/codemirror/codemirror.js"></script>
+  <link rel="stylesheet" href="lib/codemirror/codemirror.css">
+  <script src="lib/codemirror/javascript.js"></script>
+
+  <script src="lib/codemirror/matchbrackets.js"></script>
+  <script src="lib/codemirror/trailingspace.js"></script>
+  <script src="lib/codemirror/closebrackets.js"></script>
+  <script src="lib/jshint.js"></script>
+  <script src="lib/codemirror/lint.js"></script>
+  <script src="lib/codemirror/javascript-lint.js"></script>
+  <link rel="stylesheet" href="lib/codemirror/lint.css">
+
+  <script src="https://unpkg.com/audioworklet-polyfill/dist/audioworklet-polyfill.js"></script>
+
+  <script src="livecode.js" type="module"></script>
+  <link rel="stylesheet" href="livecode.css">
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div id="container">
+    <div id="unsupported">
+      <h2>Your browser does not support AudioWorklet</h2>
+      <p>
+        AudioWorklet is currently only available in Chrome 66+
+      </p>
+    </div>
+
+    <h1 id="status">Connecting to server...</h1>
+    <div id="presets"></div>
+    <div id="main">
+      <div id="editor"></div>
+      <div id="controls"></div>
+      <div id="scopes"></div>
+    </div>
+  </div>
+</body>
+</html>
