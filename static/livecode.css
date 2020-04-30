@@ -129,7 +129,8 @@ button.stop.down {
 
 #main {
   display: grid;
-  grid-template-columns: 5fr 1fr 2fr;
+  grid-template-columns: 1fr 5fr 1fr 2fr;
+  row-gap: 30px;
 }
 
 /* Hack. */
@@ -137,6 +138,13 @@ button.stop.down {
   margin-bottom: 0 !important;
 }
 
+.player-id {
+  display: inline-block;
+  border: 1px dashed black;
+  text-align: center;
+  font-size: 20px;
+  line-height: 50px;
+}
 
 #editor {
   display: inline-block;

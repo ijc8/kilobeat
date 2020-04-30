@@ -3,8 +3,10 @@
 import { Scope } from "./Scope.js";
 
 let audio;
+// TODO: reorganize into one map of player id => Player object (with all relevant state).
 let customNodes = {};
 let codeViews = {};
+let elements = {};
 let CustomAudioNode;
 let analyser;
 let processorCount = 0;
@@ -60,6 +62,7 @@ function getCode(userCode, processorName) {
   let pi = Math.PI;
   let sin = Math.sin;
   let random = Math.random;
+  let x = 0, y = 0, z = 0;
 
   function loop(numFrames, out, sampleRate) {
     const amp = 0.1;
@@ -207,9 +210,10 @@ function createEditor() {
 
 function createViewer(id, code) {
   let parent = document.getElementById("main");
-  let child = document.createElement('div');
-  child.id = `p${id}-container`
-  child.innerHTML = `Player ${id}`;
+  let id_box = document.createElement('div');
+  id_box.id = `p${id}-id`
+  id_box.classList.add('player-id');
+  id_box.innerHTML = `Player ${id}`;
   let view = document.createElement('div');
   view.id = `p${id}-code`;
   view.value = code;
@@ -224,8 +228,18 @@ function createViewer(id, code) {
     scrollbarStyle: null,
   });
   codeViews[id] = editor;
-  child.appendChild(view);
-  parent.appendChild(child);
+  let copy = document.createElement('div')
+  copy.id = `p${id}-copy`
+  copy.innerHTML = "TODO";
+
+  let scopes = document.createElement('div')
+  scopes.id = `p${id}-scopes`
+  scopes.innerHTML = "TODO";
+  elements[id] = [id_box, view, copy, scopes];
+  parent.appendChild(id_box);
+  parent.appendChild(view);
+  parent.appendChild(copy);
+  parent.appendChild(scopes);
 };
 
 function createScopes() {
@@ -272,6 +286,7 @@ function main() {
         console.log('hello: I am', id, 'and there are', players);
         player_id = id;
         document.getElementById("status").innerHTML = `You are player ${id}.`
+        document.getElementById("player-id").innerHTML = `You (${id})`
         for (let [player, code] of Object.entries(players)) {
           createViewer(player, code);
           runCode(player, code);
@@ -286,7 +301,10 @@ function main() {
       socket.on('leave', (id) => {
         console.log('leave', id)
         stopAudio(id);
-        document.getElementById(`p${id}-container`).remove();
+        for (let element of elements[id]) {
+          element.remove();
+        }
+        delete elements[id];
         delete codeViews[id];
       });
 
