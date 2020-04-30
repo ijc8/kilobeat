@@ -147,8 +147,9 @@ button.stop.down {
 }
 
 #scopes {
-  display: inline-block;
+  display: grid;
   font-size: 12px;
+  grid-template-columns: 1fr 1fr;
 }
 
 #scopes .scope {

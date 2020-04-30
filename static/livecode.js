@@ -243,24 +243,20 @@ function createScopes() {
 
   const toRender = [
     {
-      label: "Sum",
       analyser: analyser,
       style: "rgb(212, 100, 100)",
       edgeThreshold: 0.09,
-      active: true
     }
   ];
 
   scopeOsc.appendTo(scopesContainer);
 
-  //const scopeSpectrum = new Scope();
-  //scopeSpectrum.appendTo(scopesContainer);
-
+  const scopeSpectrum = new Scope();
+  scopeSpectrum.appendTo(scopesContainer);
 
   function loop() {
-    scopeOsc.renderScope(toRender.filter(item => item.active));
-
-    // scopeSpectrum.renderSpectrum(analyser);
+    scopeOsc.renderScope(toRender);
+    scopeSpectrum.renderSpectrum(analyser);
     requestAnimationFrame(loop);
   }
 
