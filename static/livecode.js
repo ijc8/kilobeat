@@ -3,12 +3,9 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// TODO: reorganize into one map of player id => Player object (with all relevant state).
-let customNodes = {};
-let codeViews = {};
-let elements = {};
+// Map of id => {customNode, editor, elements}
+let players = {me: {elements: []}};
 let CustomAudioNode;
-let analyser;
 let processorCount = 0;
 
 let socket = null;
@@ -50,9 +47,9 @@ function resumeContextOnInteraction(audioContext) {
 }
 
 function stopAudio(id) {
-  if (customNodes[id] !== undefined) {
-    customNodes[id].disconnect();
-    customNodes[id] = undefined;
+  if (players[id].customNode !== undefined) {
+    players[id].customNode.disconnect();
+    players[id].customNode = undefined;
   }
 }
 
@@ -99,8 +96,8 @@ function runAudioWorklet(id, workletUrl, processorName) {
     let customNode = new CustomAudioNode(audio, processorName);
 
     customNode.connect(audio.destination);
-    customNode.connect(analyser);
-    customNodes[id] = customNode;
+    customNode.connect(players[id].analyser);
+    players[id].customNode = customNode;
   });
 }
 
@@ -132,13 +129,13 @@ function addKeyCommandToButton(button, keyCommand) {
   });
 }
 
-function runCode(id, userCode) {
+function runCode(id) {
   const processorName = `processor-${id}-${processorCount++}`;
-  const code = getCode(userCode, processorName);
+  const code = getCode(players[id].code, processorName);
   const blob = new Blob([code], { type: "application/javascript" });
   const url = window.URL.createObjectURL(blob);
 
-  console.log("runCode", id, userCode, processorName);
+  console.log("runCode", id, players[id].code, processorName);
   runAudioWorklet(id, url, processorName);
 }
 
@@ -152,8 +149,9 @@ function createEditor() {
 
   function runEditorCode(editor) {
     const userCode = editor.getDoc().getValue();
+    players["me"].code = userCode;
     socket.emit("code", userCode);
-    runCode(player_id, userCode);
+    runCode("me");
   }
 
   function playAudio(editor) {
@@ -208,7 +206,7 @@ function createEditor() {
   }
 }
 
-function createViewer(id, code) {
+function createViewer(id) {
   let parent = document.getElementById("main");
   let id_box = document.createElement('div');
   id_box.id = `p${id}-id`
@@ -216,10 +214,9 @@ function createViewer(id, code) {
   id_box.innerHTML = `Player ${id}`;
   let view = document.createElement('div');
   view.id = `p${id}-code`;
-  view.value = code;
   const editor = CodeMirror(view, {
     mode: "javascript",
-    value: code,
+    value: players[id].code,
     lineNumbers: false,
     lint: { esversion: 6 },
     viewportMargin: Infinity,
@@ -227,26 +224,27 @@ function createViewer(id, code) {
     readOnly: true,
     scrollbarStyle: null,
   });
-  codeViews[id] = editor;
+  setTimeout(() => editor.refresh(), 0);
+  console.log(players);
+  players[id].editor = editor;
   let copy = document.createElement('div')
   copy.id = `p${id}-copy`
   copy.innerHTML = "TODO";
 
   let scopes = document.createElement('div')
   scopes.id = `p${id}-scopes`
-  scopes.innerHTML = "TODO";
-  elements[id] = [id_box, view, copy, scopes];
+  scopes.classList.add('scopes');
+  players[id].elements = [id_box, view, copy, scopes];
   parent.appendChild(id_box);
   parent.appendChild(view);
   parent.appendChild(copy);
   parent.appendChild(scopes);
 };
 
-function createScopes() {
-  const scopesContainer = document.getElementById("scopes");
-  if (scopesContainer === null) { return; }
+function createScopes(id) {
+  const scopesContainer = document.getElementById(`p${id}-scopes`);
 
-  analyser = audio.createAnalyser();
+  let analyser = audio.createAnalyser();
   window.analyser = analyser;
   analyser.fftSize = Math.pow(2, 11);
   analyser.minDecibels = -96;
@@ -268,6 +266,10 @@ function createScopes() {
   const scopeSpectrum = new Scope();
   scopeSpectrum.appendTo(scopesContainer);
 
+  players[id].analyser = analyser;
+  players[id].scopeOsc = scopeOsc;
+  players[id].scopeSpectrum = scopeSpectrum;
+
   function loop() {
     scopeOsc.renderScope(toRender);
     scopeSpectrum.renderSpectrum(analyser);
@@ -282,35 +284,41 @@ function main() {
   socket = io();
   socket.on('connect', function() {
       console.log("connected!");
-      socket.on('hello', ({id, players}) => {
-        console.log('hello: I am', id, 'and there are', players);
+      socket.on('hello', ({id, players: current_players}) => {
+        console.log('hello: I am', id, 'and there are', current_players);
         player_id = id;
         document.getElementById("status").innerHTML = `You are player ${id}.`
         document.getElementById("player-id").innerHTML = `You (${id})`
-        for (let [player, code] of Object.entries(players)) {
-          createViewer(player, code);
-          runCode(player, code);
+        console.log(current_players);
+        for (let [id, code] of Object.entries(current_players)) {
+          players[id] = {code: code};
+          console.log(id, players);
+          createViewer(id);
+          createScopes(id);
+          runCode(id);
         }
       })
 
       socket.on('join', (id) => {
         console.log('join', id)
-        createViewer(id, "0");
+        players[id] = {code: "0"};
+        createViewer(id);
+        createScopes(id);
       });
 
       socket.on('leave', (id) => {
         console.log('leave', id)
         stopAudio(id);
-        for (let element of elements[id]) {
+        for (let element of players[id].elements) {
           element.remove();
         }
-        delete elements[id];
-        delete codeViews[id];
+        delete players[id];
       });
 
       socket.on('code', ({id, code}) => {
-        codeViews[id].getDoc().setValue(code);
-        runCode(id, code);
+        players[id].code = code;
+        players[id].editor.getDoc().setValue(code);
+        runCode(id);
       })
   });
 
@@ -331,7 +339,7 @@ function main() {
     audio = new AudioContext();
     resumeContextOnInteraction(audio);
 
-    createScopes();
+    createScopes("me");
 
     createEditor();
   }

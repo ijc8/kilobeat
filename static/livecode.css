@@ -71,10 +71,6 @@ button.toggle.active {
   opacity: 1.0
 }
 
-#scopes button {
-  margin: 0;
-}
-
 button.run:hover {
   box-shadow: 4px 4px rgb(43, 156, 212);
 }
@@ -154,20 +150,20 @@ button.stop.down {
   display: inline-block;
 }
 
-#scopes {
+.scopes {
   display: grid;
   font-size: 12px;
   grid-template-columns: 1fr 1fr;
 }
 
-#scopes .scope {
+.scopes .scope {
   box-sizing: border-box;
   border: 1px black solid;
   min-height: 50px;
   position: relative;
 }
 
-#scopes .scope h3 {
+.scopes .scope h3 {
   margin: 0 5px;
   font-weight: bold;
 }
