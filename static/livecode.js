@@ -7,10 +7,18 @@ let audio;
 let players = {me: {elements: []}};
 let CustomAudioNode;
 let processorCount = 0;
+// TODO: get this from the server.
+let startTime = Date.now() / 1000;
+let clockUpdate = null;
 
 let socket = null;
 let player_id = null;
 
+
+function updateClock() {
+  document.getElementById("clock-display").value = Math.floor(getTime());
+  clockUpdate = setTimeout(updateClock, 500);
+}
 
 const presets = [
   {
@@ -56,7 +64,7 @@ function stopAudio(id) {
 function getCode(userCode, processorName) {
   // Ad-hoc (definitely not frame-precise) synchronization method.
   return `
-  let t = ${Date.now() / 1000};
+  let t = ${getTime()};
   let pi = Math.PI;
   let sin = Math.sin;
   let random = Math.random;
@@ -205,6 +213,15 @@ function createEditor() {
       if (presetsEl !== null) { presetsEl.appendChild(button); }
     });
   }
+
+  let resetButton = createButton("Reset");
+  // Currently will *not* reset the timers in AudioWorkers.
+  resetButton.addEventListener("click", () => {
+    startTime = Date.now() / 1000;
+    clearTimeout(clockUpdate);
+    updateClock();
+  });
+  document.getElementById("clock").appendChild(resetButton);
 }
 
 function createViewer(id) {
@@ -280,6 +297,10 @@ function createScopes(id) {
   loop();
 }
 
+function getTime() {
+  return Date.now() / 1000 - startTime;
+}
+
 function main() {
 
   socket = io();
@@ -344,6 +365,8 @@ function main() {
 
     createEditor();
   }
+
+  updateClock();
 }
 
 function ready(fn) {

@@ -98,9 +98,34 @@ button.stop.down {
 #presets {
   display: inline-block;
   height: 50px;
+  flex-grow: 1;
 }
 
 #presets button {
+  height: 30px;
+}
+
+#clock-wrapper {
+  position: relative;
+}
+
+#clock-icon {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+  filter: grayscale(1) contrast(1.5) opacity(0.5);
+}
+
+#clock-display {
+  height: 30px;
+  box-sizing: border-box;
+  text-align: right;
+  font-family: monospace;
+  font-size: x-large;
+  width: 4em;
+}
+
+#clock button {
   height: 30px;
 }
 
@@ -127,6 +152,10 @@ button.stop.down {
   display: grid;
   grid-template-columns: 1fr 5fr 1fr 2fr;
   row-gap: 30px;
+}
+
+#menu {
+  display: flex;
 }
 
 /* Hack. */
