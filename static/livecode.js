@@ -3,7 +3,7 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// Map of id => {customNode, editor, elements}
+// Map of id => {customNode, editor, elements, scopes}
 let players = {me: {elements: []}};
 let CustomAudioNode;
 let processorCount = 0;
@@ -54,8 +54,9 @@ function stopAudio(id) {
 }
 
 function getCode(userCode, processorName) {
+  // Ad-hoc (definitely not frame-precise) synchronization method.
   return `
-  let t = 0;
+  let t = ${Date.now() / 1000};
   let pi = Math.PI;
   let sin = Math.sin;
   let random = Math.random;
