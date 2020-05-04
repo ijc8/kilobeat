@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, url_for
 from flask_socketio import SocketIO, emit
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -10,16 +11,18 @@ player_sid_map = {}
 sid_player_map = {}
 player_code = {}
 
+start_time = time.time()
+
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
 def index(path):
     return app.send_static_file(path)
 
 @socketio.on('connect')
-def test_connect():
+def connect():
     global player_count
     print('connect', request.sid)
-    emit('hello', {'id': player_count, 'players': player_code})
+    emit('hello', {'id': player_count, 'players': player_code, 'time': time.time() - start_time})
     emit('join', player_count, broadcast=True, include_self=False)
     player_sid_map[player_count] = request.sid
     sid_player_map[request.sid] = player_count
@@ -27,7 +30,7 @@ def test_connect():
     player_count += 1
 
 @socketio.on('disconnect')
-def test_disconnect():
+def disconnect():
     print('disconnect', request.sid)
     id = sid_player_map[request.sid]
     emit('leave', id, broadcast=True, include_self=False)
@@ -41,6 +44,12 @@ def handle_code(code):
     print('received code', code, 'from', id)
     player_code[id] = code
     emit('code', {'code': code, 'id': sid_player_map[request.sid]}, broadcast=True, include_self=False)
+
+@socketio.on('reset')
+def handle_reset():
+    global start_time
+    start_time = time.time()
+    emit('reset', broadcast=True, include_self=True)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8765)

@@ -15,10 +15,15 @@ let socket = null;
 let player_id = null;
 
 
+function getTime() {
+  return Date.now() / 1000 - startTime;
+}
+
 function updateClock() {
   document.getElementById("clock-display").value = Math.floor(getTime());
   clockUpdate = setTimeout(updateClock, 500);
 }
+
 
 const presets = [
   {
@@ -83,6 +88,7 @@ function getCode(userCode, processorName) {
   class CustomProcessor extends AudioWorkletProcessor {
     constructor() {
       super();
+      this.port.onmessage = (m) => t = m.data;
     }
 
     process(inputs, outputs, parameters) {
@@ -216,11 +222,7 @@ function createEditor() {
 
   let resetButton = createButton("Reset");
   // Currently will *not* reset the timers in AudioWorkers.
-  resetButton.addEventListener("click", () => {
-    startTime = Date.now() / 1000;
-    clearTimeout(clockUpdate);
-    updateClock();
-  });
+  resetButton.addEventListener("click", () => socket.emit("reset"));
   document.getElementById("clock").appendChild(resetButton);
 }
 
@@ -297,16 +299,13 @@ function createScopes(id) {
   loop();
 }
 
-function getTime() {
-  return Date.now() / 1000 - startTime;
-}
-
 function main() {
 
   socket = io();
   socket.on('connect', function() {
       console.log("connected!");
-      socket.on('hello', ({id, players: current_players}) => {
+      socket.on('hello', ({id, players: current_players, time}) => {
+        startTime = Date.now() / 1000 - time;
         console.log('hello: I am', id, 'and there are', current_players);
         player_id = id;
         document.getElementById("status").innerHTML = `You are player ${id}.`
@@ -341,6 +340,18 @@ function main() {
         players[id].code = code;
         players[id].editor.getDoc().setValue(code);
         runCode(id);
+      })
+
+      socket.on('reset', () => {
+        startTime = Date.now() / 1000;
+        clearTimeout(clockUpdate);
+        updateClock();
+        for (let player of Object.values(players)) {
+          // I wonder if there's a way to broadcast to all AudioWorkletNodes at once?
+          // Maybe they could all have a reference to one SharedArrayBuffer?
+          if (player.customNode)
+            player.customNode.port.postMessage(getTime());
+        }
       })
   });
 
