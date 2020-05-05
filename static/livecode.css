@@ -173,6 +173,7 @@ button.stop.down {
 
 #editor {
   display: inline-block;
+  min-width: 0;
 }
 
 #controls {
