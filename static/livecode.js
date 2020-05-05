@@ -3,16 +3,17 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// Map of id => {customNode, editor, elements, scopes}
+// Map of id => {customNode, channel, editor, elements, scopes}
 let players = {me: {elements: []}};
 let CustomAudioNode;
 let processorCount = 0;
-// TODO: get this from the server.
+// This is replaced when we connect to the server.
 let startTime = Date.now() / 1000;
 let clockUpdate = null;
+let outputNode = null;
 
 let socket = null;
-let player_id = null;
+let merger = null;
 
 
 function getTime() {
@@ -59,31 +60,47 @@ function resumeContextOnInteraction(audioContext) {
   }
 }
 
+function getUsedChannels() {
+  return Object.values(players).map(({channel}) => channel).filter(c => c !== null && c !== undefined);
+}
+
+function getNextChannel() {
+  let channels = getUsedChannels().sort();
+  let prev = -1;
+  for (let i = 0; i < channels.length; i++) {
+    if (channels[i] - prev > 1)
+      return prev + 1;
+    prev = channels[i];
+  }
+  return prev + 1;
+}
+
 function stopAudio(id) {
   if (players[id].customNode !== undefined) {
+    merger.disconnect(players[id].customNode);
+    players[id].channel = null;
     players[id].customNode.disconnect();
     players[id].customNode = undefined;
   }
 }
 
 function getCode(userCode, processorName) {
-  // Ad-hoc (definitely not frame-precise) synchronization method.
+  function generateNames() {
+    // Note that this includes "me" to refer to current player.
+    return Object.entries(players).map(([id, {channel}]) => {
+      if (channel === null || channel === undefined)
+        return '';
+      let varName = (id == "me") ? "me" : `p${id}`;
+      return `let ${varName} = inputs[0][${channel}][i];`
+    }).join('\n');
+  }
+
   return `
-  let t = ${getTime()};
+  let t = 0;
   let pi = Math.PI;
   let sin = Math.sin;
   let random = Math.random;
   let x = 0, y = 0, z = 0;
-
-  function loop(numFrames, out, sampleRate) {
-    const amp = 0.1;
-    for (let i = 0; i < numFrames; i++) {
-      //const noise = Math.random() * 2 - 1;
-      let val = ${userCode};
-      out[i] = val * amp;
-      t += 1 / sampleRate;
-    }
-  }
 
   class CustomProcessor extends AudioWorkletProcessor {
     constructor() {
@@ -94,9 +111,11 @@ function getCode(userCode, processorName) {
     process(inputs, outputs, parameters) {
       const out = outputs[0][0];
       const numFrames = out.length;
-
-      loop(numFrames, out, sampleRate);
-
+      for (let i = 0; i < numFrames; i++) {
+        ${generateNames()}
+        out[i] = ${userCode};
+        t += 1 / sampleRate;
+      }
       return true;
     }
   }
@@ -109,9 +128,17 @@ function runAudioWorklet(id, workletUrl, processorName) {
     stopAudio(id);
 
     let customNode = new CustomAudioNode(audio, processorName);
+    // TODO: I think we could get sample-accurate sync (within worklets on one client)
+    // by using currentFrame and giving every worklet the same offset from it.
+    customNode.port.postMessage(getTime());
 
-    customNode.connect(audio.destination);
+    merger.connect(customNode);
+    customNode.connect(outputNode);
     customNode.connect(players[id].analyser);
+    // TODO: may wish to do this earlier (or otherwise rethink this)
+    // to guarantee that worklet code (generated earlier) matches channel map.
+    players[id].channel = getNextChannel();
+    customNode.connect(merger, 0, players[id].channel);
     players[id].customNode = customNode;
   });
 }
@@ -119,19 +146,16 @@ function runAudioWorklet(id, workletUrl, processorName) {
 function createButton(text) {
   const button = document.createElement("button");
   button.textContent = text;
-
   const onMouseUp = () => {
     button.classList.remove("down");
     document.removeEventListener("mouseup", onMouseUp, false);
   };
-
   const onMouseDown = () => {
     button.classList.add("down");
     document.addEventListener("mouseup", onMouseUp, false);
   };
 
   button.addEventListener("mousedown", onMouseDown);
-
   return button;
 }
 
@@ -147,6 +171,7 @@ function addKeyCommandToButton(button, keyCommand) {
 function runCode(id) {
   const processorName = `processor-${id}-${processorCount++}`;
   const code = getCode(players[id].code, processorName);
+  console.log("Generated code", code);
   const blob = new Blob([code], { type: "application/javascript" });
   const url = window.URL.createObjectURL(blob);
 
@@ -300,14 +325,13 @@ function createScopes(id) {
 }
 
 function main() {
-
   socket = io();
   socket.on('connect', function() {
       console.log("connected!");
       socket.on('hello', ({id, players: current_players, time}) => {
         startTime = Date.now() / 1000 - time;
         console.log('hello: I am', id, 'and there are', current_players);
-        player_id = id;
+        players[id] = players["me"];
         document.getElementById("status").innerHTML = `You are player ${id}.`
         document.getElementById("player-id").innerHTML = `You (${id})`
         console.log(current_players);
@@ -371,9 +395,12 @@ function main() {
 
     audio = new AudioContext();
     resumeContextOnInteraction(audio);
-
+    // Later, might want to create a new merger to grow input channels dynamically,
+    // rather than commiting to a max size here.
+    merger = audio.createChannelMerger(8);
+    outputNode = audio.createGain(0.1);
+    outputNode.connect(audio.destination);
     createScopes("me");
-
     createEditor();
   }
 
@@ -381,7 +408,7 @@ function main() {
 }
 
 function ready(fn) {
-  if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading"){
+  if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
     fn();
   } else {
     document.addEventListener("DOMContentLoaded", fn);
