@@ -302,9 +302,8 @@ function createViewer(id) {
   setTimeout(() => editor.refresh(), 0);
   console.log(players);
   players[id].editor = editor;
-  let copy = document.createElement('div')
-  copy.id = `p${id}-copy`
-  copy.innerHTML = "TODO";
+  let copy = createButton("Copy 📄");
+  copy.addEventListener('click', () => navigator.clipboard.writeText(players[id].code));
 
   let scopes = document.createElement('div')
   scopes.id = `p${id}-scopes`
