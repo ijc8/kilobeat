@@ -32,12 +32,33 @@ const presets = [
     code: `0`
   },
   {
-    name: "White Noise",
-    code: `random() * 2 - 1`
+    name: "Noise",
+    code: `rand() * 2 - 1`
   },
   {
-    name: "Sine Wave",
-    code: `sin(2 * pi * 666 * t)`
+    name: "Sine",
+    code: `sin(2 * pi * 400 * t)`
+  },
+  // Note that Sawtooth and Square here have DC bias.
+  {
+    name: "Sawtooth",
+    code: `(t % .005) / .005`
+  },
+  {
+    name: "Square",
+    code: `(t % .005) > .0025`
+  },
+  {
+    name: "Chord",
+    code: `[300,500,800].map(f=>sin(2*pi*f*t)).reduce((a,b)=>a+b)/3`
+  },
+  {
+    name: "Rhythm",
+    code: `t < x ? (t - x) : (x = t + choice(.6,.3,.2,.1), 0)`
+  },
+  {
+    name: "c o m p u t e r m u s i c",
+    code: `(sin(2*pi*y*t)+sin(2*pi*z*t))/2*(t<x?(t-x):(x=t+.2,y=rand()*500+500,z=rand()*1000+500,0))`
   }
 ];
 
@@ -99,8 +120,17 @@ function getCode(userCode, processorName) {
   let t = 0;
   let pi = Math.PI;
   let sin = Math.sin;
-  let random = Math.random;
+  let rand = Math.random;
   let x = 0, y = 0, z = 0;
+
+  // These are still up for debate.
+  let s = x => sin(2*pi*x);
+  let r = rand;
+
+  function choice(...choices) {
+    var index = Math.floor(Math.random() * choices.length);
+    return choices[index];
+  }
 
   class CustomProcessor extends AudioWorkletProcessor {
     constructor() {
