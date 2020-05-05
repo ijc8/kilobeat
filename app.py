@@ -51,5 +51,9 @@ def handle_reset():
     start_time = time.time()
     emit('reset', broadcast=True, include_self=True)
 
+@socketio.on('editor')
+def handle_editor(state):
+    emit('editor', {'state': state, 'id': sid_player_map[request.sid]}, broadcast=True, include_self=False)
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8765)

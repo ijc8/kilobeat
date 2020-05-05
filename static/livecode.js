@@ -13,6 +13,7 @@ let clockUpdate = null;
 let outputNode = null;
 
 let socket = null;
+let lastSent = null;
 let merger = null;
 
 
@@ -213,7 +214,7 @@ function createEditor() {
   const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
 
   const runKeys = isMac ? "Cmd-Enter" : "Ctrl-Enter";
-  const runButton = createButton("Run: ");
+  const runButton = createButton("Run ");
   runButton.classList.add("run");
   addKeyCommandToButton(runButton, runKeys);
 
@@ -240,6 +241,26 @@ function createEditor() {
     tabSize: 2,
     scrollbarStyle: null
   });
+
+  let doc = editor.getDoc();
+  // Minor optimization: only set this off after seeing cursorActivity.
+  function sendEditorState() {
+    // Might want to strip out irrelevant info, like selection stickiness and xRel.
+    let editorState = {
+      cursor: doc.getCursor(),
+      selections: doc.listSelections(),
+      content: doc.getValue()
+    };
+    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+    if (JSON.stringify(editorState) !== JSON.stringify(lastSent)) {
+      console.log("sending updates", editorState);
+      socket.emit('editor', editorState);
+      lastSent = editorState;
+    }
+    setTimeout(sendEditorState, 200);
+  }
+
+  sendEditorState();
 
   document.addEventListener("keydown", event => {
     const isModDown = isMac ? event.metaKey : event.ctrlKey;
@@ -269,7 +290,7 @@ function createEditor() {
 
     presets.forEach(preset => {
       const button = createButton(preset.name);
-      button.addEventListener("click", () => editor.getDoc().setValue(preset.code));
+      button.addEventListener("click", () => doc.setValue(preset.code));
       const presetsEl = document.getElementById("presets");
       if (presetsEl !== null) { presetsEl.appendChild(button); }
     });
@@ -289,6 +310,7 @@ function createViewer(id) {
   id_box.innerHTML = `Player ${id}`;
   let view = document.createElement('div');
   view.id = `p${id}-code`;
+  view.classList.add("editor");
   const editor = CodeMirror(view, {
     mode: "javascript",
     value: players[id].code,
@@ -304,6 +326,7 @@ function createViewer(id) {
   players[id].editor = editor;
   let copy = createButton("Copy 📄");
   copy.addEventListener('click', () => navigator.clipboard.writeText(players[id].code));
+  copy.classList.add("run");
 
   let scopes = document.createElement('div')
   scopes.id = `p${id}-scopes`
@@ -405,6 +428,13 @@ function main() {
           if (player.customNode)
             player.customNode.port.postMessage(getTime());
         }
+      })
+
+      socket.on('editor', ({id, state: {cursor, selections, content}}) => {
+        let doc = players[id].editor.getDoc();
+        doc.setValue(content);
+        doc.setCursor(cursor);
+        doc.setSelections(selections);
       })
   });
 

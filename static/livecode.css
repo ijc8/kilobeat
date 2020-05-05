@@ -71,6 +71,10 @@ button.toggle.active {
   opacity: 1.0
 }
 
+button.run {
+  width: 80%;
+}
+
 button.run:hover {
   box-shadow: 4px 4px rgb(43, 156, 212);
 }
@@ -81,18 +85,6 @@ button.run:focus {
 
 button.run.down {
   box-shadow: 2px 2px rgb(43, 156, 212);
-}
-
-button.stop:hover {
-  box-shadow: 4px 4px rgb(212, 100, 100);
-}
-
-button.stop:focus {
-  border-color: rgb(212, 100, 100);
-}
-
-button.stop.down {
-  box-shadow: 2px 2px rgb(212, 100, 100);
 }
 
 #presets {
@@ -143,7 +135,7 @@ button.stop.down {
   box-shadow: inset 0 -1px 0 #bbb;
   color: rgb(33,33,33);
   font-family: monospace;
-  /*font-size: 11px;*/
+  font-size: 11px;
   margin-left: 2px;
   padding: 1px 4px;
 }
@@ -171,7 +163,7 @@ button.stop.down {
   line-height: 50px;
 }
 
-#editor {
+.editor {
   display: inline-block;
   min-width: 0;
 }
@@ -204,4 +196,8 @@ canvas {
   top: 0;
   margin: 0;
   padding: 0;
+}
+
+.CodeMirror:not(.CodeMirror-focused) .CodeMirror-cursors {
+  visibility: visible !important;
 }
