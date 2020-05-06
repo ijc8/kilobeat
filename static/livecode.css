@@ -190,14 +190,6 @@ button.run.down {
   font-weight: bold;
 }
 
-canvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-  margin: 0;
-  padding: 0;
-}
-
 .CodeMirror:not(.CodeMirror-focused) .CodeMirror-cursors {
   visibility: visible !important;
 }
