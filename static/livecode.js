@@ -57,10 +57,10 @@ const presets = [
     name: "Rhythm",
     code: `t < x ? (t - x) : (x = t + choice(.6,.3,.2,.1), 0)`
   },
-  {
+  /*{
     name: "c o m p u t e r m u s i c",
     code: `(sin(2*pi*y*t)+sin(2*pi*z*t))/2*(t<x?(t-x):(x=t+.2,y=rand()*500+500,z=rand()*1000+500,0))`
-  }
+  }*/
 ];
 
 function resumeContextOnInteraction(audioContext) {
@@ -206,6 +206,9 @@ function runCode(id) {
   const blob = new Blob([code], { type: "application/javascript" });
   const url = window.URL.createObjectURL(blob);
 
+  // Trigger CSS animation.
+  players[id].editorContainer.classList.add("ran");
+  setTimeout(() => players[id].editorContainer.classList.remove("ran"), 100);
   console.log("runCode", id, players[id].code, processorName);
   runAudioWorklet(id, url, processorName);
 }
@@ -231,6 +234,7 @@ function createEditor() {
 
   // code mirror
   const editorWrap = document.getElementById("editor");
+  players["me"].editorContainer = editorWrap;
   if (editorWrap === null) { return; }
   const editor = CodeMirror(editorWrap, {
     mode: "javascript",
@@ -331,6 +335,7 @@ function createViewer(id) {
   let scopes = document.createElement('div')
   scopes.id = `p${id}-scopes`
   scopes.classList.add('scopes');
+  players[id].editorContainer = view;
   players[id].elements = [id_box, view, copy, scopes];
   parent.appendChild(id_box);
   parent.appendChild(view);

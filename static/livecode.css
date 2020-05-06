@@ -201,3 +201,14 @@ canvas {
 .CodeMirror:not(.CodeMirror-focused) .CodeMirror-cursors {
   visibility: visible !important;
 }
+
+.editor {
+  outline: solid 0px;
+  transition: all 0.5s;
+  z-index: 1;
+}
+
+.ran {
+  outline: solid 10px greenyellow;
+  transition: all 0.1s;
+}
