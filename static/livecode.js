@@ -468,8 +468,22 @@ function main() {
     createScopes("me");
     createEditor();
 
-    let s = new SpatializedSample(document.getElementById("test-canvas"), audio);
-    players["me"].panner = s.panner;
+    let panner = audio.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.coneOuterGain = 0.1;
+    panner.coneOuterAngle = 180;
+    panner.coneInnerAngle = 0;
+
+    panner.connect(audio.destination);
+    // Position the listener at the origin.
+    audio.listener.setPosition(0, 0, 0);
+    players["me"].panner = panner;
+
+    let callback = ({x, y, angle}) => {
+      panner.setPosition(x, y, -0.5);
+      panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+    }
+    let field = new Field(document.getElementById("test-canvas"), callback);
   }
 
   updateClock();
@@ -503,12 +517,11 @@ function ready(fn) {
 
 
 // Draws a canvas and tracks mouse click/drags on the canvas.
-function Field(canvas) {
+function Field(canvas, callback) {
   this.ANGLE_STEP = 0.2;
   this.canvas = canvas;
   this.center = {x: canvas.width/2, y: canvas.height/2};
-  this.angle = 0;
-  this.point = null;
+  this.speakers = [{x: 0, y: 0, angle: 0}];
 
   var obj = this;
   // Setup mouse listeners.
@@ -519,17 +532,18 @@ function Field(canvas) {
     obj.handleMouseWheel.apply(obj, arguments);
   });
 
-  this.manIcon = new Image();
-  this.manIcon.src = 'static/man.svg';
+  this.listenerIcon = new Image();
+  this.listenerIcon.src = 'static/headphones.svg';
 
   this.speakerIcon = new Image();
   this.speakerIcon.src = 'static/speaker.svg';
 
   // Render the scene when the icon has loaded.
   var ctx = this;
-  this.manIcon.onload = function() {
+  this.listenerIcon.onload = function() {
     ctx.render();
   }
+  this.callback = callback;
 }
 
 Field.prototype.render = function() {
@@ -537,19 +551,20 @@ Field.prototype.render = function() {
   var ctx = this.canvas.getContext('2d');
   ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-  ctx.drawImage(this.manIcon, this.center.x - this.manIcon.width/2,
-                              this.center.y - this.manIcon.height/2);
+  ctx.save();
+  ctx.translate(this.center.x - this.listenerIcon.width/2, this.center.y - this.listenerIcon.height/2)
+  ctx.scale(2, 2);
+  ctx.drawImage(this.listenerIcon, 0, 0);
+  ctx.restore();
   ctx.fill();
 
-  if (this.point) {
+  for (let speaker of this.speakers) {
     // Draw it rotated.
     ctx.save();
-    ctx.translate(this.point.x, this.point.y);
-    ctx.rotate(this.angle);
+    ctx.translate(speaker.x, speaker.y);
+    ctx.rotate(speaker.angle);
     ctx.translate(-this.speakerIcon.width/2, -this.speakerIcon.height/2);
     ctx.drawImage(this.speakerIcon, 0, 0);
-    //ctx.drawImage(this.speakerIcon, this.point.x - this.speakerIcon.width/2,
-    //                                this.point.y - this.speakerIcon.height/2);
     ctx.restore();
   }
   ctx.fill();
@@ -558,90 +573,29 @@ Field.prototype.render = function() {
 Field.prototype.handleMouseMove = function(e) {
   if (e.buttons) {
     // Update the position.
-    this.point = {
-      x: e.offsetX == undefined ? (e.layerX - e.currentTarget.offsetLeft) : e.offsetX,
-      y: e.offsetY == undefined ? (e.layerY - e.currentTarget.offsetTop) : e.offsetY
-    };
-    // Re-render the canvas.
+    this.speakers[0].x = e.offsetX == undefined ? (e.layerX - e.currentTarget.offsetLeft) : e.offsetX;
+    this.speakers[0].y = e.offsetY == undefined ? (e.layerY - e.currentTarget.offsetTop) : e.offsetY;
+
     this.render();
-    // Callback.
-    if (this.callback) {
-      // Callback in coordinate system centered at canvas center.
-      this.callback({x: this.point.x - this.center.x,
-                     y: this.point.y - this.center.y});
-    }
+    this.callbackHelper();
   }
 };
 
 Field.prototype.handleMouseWheel = function(e) {
   e.preventDefault();
-  this.changeAngleHelper(e.deltaY/100);
-};
-
-Field.prototype.changeAngleHelper = function(delta) {
-  this.angle += delta;
-  if (this.angleCallback) {
-    this.angleCallback(this.angle);
-  }
+  this.speakers[0].angle += e.deltaY / 100;
+  this.callbackHelper();
   this.render();
-}
-
-Field.prototype.registerPointChanged = function(callback) {
-  this.callback = callback;
 };
 
-Field.prototype.registerAngleChanged = function(callback) {
-  this.angleCallback = callback;
-};
-
-function SpatializedSample(canvas, context) {
-  var sample = this;
-  this.size = {width: canvas.width, height: canvas.height};
-
-  // Create a new Area.
-  let field = new Field(canvas);
-  field.registerPointChanged(function() {
-    sample.changePosition.apply(sample, arguments);
-  });
-  field.registerAngleChanged(function() {
-    sample.changeAngle.apply(sample, arguments);
-  });
-
-  // Hook up the audio graph for this sample.
-  let panner = context.createPanner();
-  panner.panningModel = 'HRTF';
-  panner.coneOuterGain = 0.1;
-  panner.coneOuterAngle = 180;
-  panner.coneInnerAngle = 0;
-  // Set the panner node to be at the origin looking in the +x
-  // direction.
-  panner.connect(context.destination);
-  // Position the listener at the origin.
-  context.listener.setPosition(0, 0, 0);
-
-  // Expose parts of the audio graph to other functions.
-  this.panner = panner;
-}
-
-SpatializedSample.prototype.changePosition = function(position) {
-  // Position coordinates are in normalized canvas coordinates
-  // with -0.5 < x, y < 0.5
-  if (position) {
-    var mul = 2;
-    var x = position.x / this.size.width;
-    var y = -position.y / this.size.height;
-    this.panner.setPosition(x * mul, y * mul, -0.5);
+Field.prototype.callbackHelper = function() {
+  if (this.callback) {
+    // Position coordinates are in normalized canvas coordinates
+    // with -0.5 < x, y < 0.5
+    let x = (this.speakers[0].x - this.center.x) / this.canvas.width * 2;
+    let y = (this.speakers[0].y - this.center.y) / this.canvas.height * 2;
+    this.callback({x, y, angle: this.speakers[0].angle});
   }
-};
-
-SpatializedSample.prototype.changeAngle = function(angle) {
-  console.log(angle);
-  // Compute the vector for this angle.
-  if (this.panner) {
-    this.panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
-  }
-};
-
-
+}
 
 ready(main);
