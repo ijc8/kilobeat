@@ -3,7 +3,8 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// Map of id => {customNode, channel, editor, elements, scopes}
+// Map of id => {customNode, panner, channel, editor, editorContainer, elements, scopes}
+// (Maybe it's time to make a real class?)
 let players = {me: {elements: []}};
 let CustomAudioNode;
 let processorCount = 0;
@@ -164,17 +165,13 @@ function runAudioWorklet(id, workletUrl, processorName) {
     customNode.port.postMessage(getTime());
 
     merger.connect(customNode);
-    // customNode.connect(outputNode);
+    customNode.connect(players[id].panner);
     customNode.connect(players[id].analyser);
     // TODO: may wish to do this earlier (or otherwise rethink this)
     // to guarantee that worklet code (generated earlier) matches channel map.
     players[id].channel = getNextChannel();
     customNode.connect(merger, 0, players[id].channel);
     players[id].customNode = customNode;
-
-    // TODO TEMP
-    let s = new SpatializedSample(document.getElementById("test-zone"));
-    s.play(audio, players[id].customNode);
   });
 }
 
@@ -470,6 +467,9 @@ function main() {
     outputNode.connect(audio.destination);
     createScopes("me");
     createEditor();
+
+    let s = new SpatializedSample(document.getElementById("test-canvas"), audio);
+    players["me"].panner = s.panner;
   }
 
   updateClock();
@@ -482,9 +482,6 @@ function ready(fn) {
     document.addEventListener("DOMContentLoaded", fn);
   }
 }
-
-ready(main);
-
 
 
 // Forked from https://webaudioapi.com/samples/spatialized/spatialized-sample.js, original license included here:
@@ -509,28 +506,17 @@ ready(main);
 function Field(canvas) {
   this.ANGLE_STEP = 0.2;
   this.canvas = canvas;
-  this.isMouseInside = false;
   this.center = {x: canvas.width/2, y: canvas.height/2};
   this.angle = 0;
   this.point = null;
 
   var obj = this;
   // Setup mouse listeners.
-  canvas.addEventListener('mouseover', function() {
-    obj.handleMouseOver.apply(obj, arguments)
-  });
-  canvas.addEventListener('mouseout', function() {
-    obj.handleMouseOut.apply(obj, arguments)
-  });
   canvas.addEventListener('mousemove', function() {
     obj.handleMouseMove.apply(obj, arguments)
   });
   canvas.addEventListener('wheel', function() {
     obj.handleMouseWheel.apply(obj, arguments);
-  });
-  // Setup keyboard listener
-  window.addEventListener('keydown', function() {
-    obj.handleKeyDown.apply(obj, arguments);
   });
 
   this.manIcon = new Image();
@@ -569,21 +555,8 @@ Field.prototype.render = function() {
   ctx.fill();
 };
 
-Field.prototype.handleMouseOver = function(e) {
-  this.isMouseInside = true;
-};
-
-Field.prototype.handleMouseOut = function(e) {
-  this.isMouseInside = false;
-  if (this.callback) {
-    this.callback(null);
-  }
-  this.point = null;
-  this.render();
-};
-
 Field.prototype.handleMouseMove = function(e) {
-  if (this.isMouseInside) {
+  if (e.buttons) {
     // Update the position.
     this.point = {
       x: e.offsetX == undefined ? (e.layerX - e.currentTarget.offsetLeft) : e.offsetX,
@@ -597,15 +570,6 @@ Field.prototype.handleMouseMove = function(e) {
       this.callback({x: this.point.x - this.center.x,
                      y: this.point.y - this.center.y});
     }
-  }
-};
-
-Field.prototype.handleKeyDown = function(e) {
-  // If it's right or left arrow, change the angle.
-  if (e.keyCode == 37 || e.keyCode == 38) {
-    this.changeAngleHelper(-this.ANGLE_STEP);
-  } else if (e.keyCode == 39 || e.keyCode == 40) {
-    this.changeAngleHelper(this.ANGLE_STEP);
   }
 };
 
@@ -630,15 +594,9 @@ Field.prototype.registerAngleChanged = function(callback) {
   this.angleCallback = callback;
 };
 
-function SpatializedSample(el) {
+function SpatializedSample(canvas, context) {
   var sample = this;
-  this.size = {width: 400, height: 300};
-
-  // Create a new canvas element.
-  var canvas = document.createElement('canvas');
-  canvas.setAttribute('width', this.size.width);
-  canvas.setAttribute('height', this.size.height);
-  el.appendChild(canvas);
+  this.size = {width: canvas.width, height: canvas.height};
 
   // Create a new Area.
   let field = new Field(canvas);
@@ -648,18 +606,16 @@ function SpatializedSample(el) {
   field.registerAngleChanged(function() {
     sample.changeAngle.apply(sample, arguments);
   });
-}
 
-SpatializedSample.prototype.play = function(context, source) {
   // Hook up the audio graph for this sample.
-  var panner = context.createPanner();
+  let panner = context.createPanner();
+  panner.panningModel = 'HRTF';
   panner.coneOuterGain = 0.1;
   panner.coneOuterAngle = 180;
   panner.coneInnerAngle = 0;
   // Set the panner node to be at the origin looking in the +x
   // direction.
   panner.connect(context.destination);
-  source.connect(panner);
   // Position the listener at the origin.
   context.listener.setPosition(0, 0, 0);
 
@@ -685,3 +641,7 @@ SpatializedSample.prototype.changeAngle = function(angle) {
     this.panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
   }
 };
+
+
+
+ready(main);

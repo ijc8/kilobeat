@@ -204,3 +204,7 @@ button.run.down {
   outline: solid 10px greenyellow;
   transition: all 0.1s;
 }
+
+canvas {
+  border: solid 1px black;
+}
