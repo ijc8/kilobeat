@@ -17,6 +17,8 @@ let socket;
 let lastSent;
 let merger;
 
+let speakerPos, lastSentSpeakerPos;
+let field;
 
 function getTime() {
   return Date.now() / 1000 - startTime;
@@ -75,11 +77,17 @@ function resumeContextOnInteraction(audioContext) {
         document.body.removeEventListener("click", resume, false);
         document.body.removeEventListener("keydown", resume, false);
       }
+
+      console.log("status", audio.state);
+      more_main();
     };
 
     document.body.addEventListener("touchend", resume, false);
     document.body.addEventListener("click", resume, false);
     document.body.addEventListener("keydown", resume, false);
+  } else {
+    console.log("status", audio.state);
+    more_main();
   }
 }
 
@@ -383,10 +391,33 @@ function createScopes(id) {
 }
 
 function main() {
+  if (window.AudioContext !== undefined && window.AudioWorkletNode !== undefined) {
+    const unsupportedEl = document.getElementById("unsupported");
+    if (unsupportedEl !== null) { unsupportedEl.remove(); }
+
+    CustomAudioNode = class CustomAudioNode extends AudioWorkletNode {
+      constructor(audioContext, processorName) {
+        super(audioContext, processorName, {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1]
+        });
+      }
+    };
+
+    audio = new AudioContext();
+    resumeContextOnInteraction(audio);
+  }
+
+  updateClock();
+}
+
+function more_main() {
+  console.log("status", audio.state);
   socket = io();
   socket.on('connect', function() {
       console.log("connected!");
-      socket.on('hello', ({id, players: current_players, time}) => {
+      socket.on('hello', ({id, players: current_players, speakers, time}) => {
         startTime = Date.now() / 1000 - time;
         console.log('hello: I am', id, 'and there are', current_players);
         players[id] = players["me"];
@@ -400,6 +431,20 @@ function main() {
           createScopes(id);
           runCode(id);
         }
+        // TODO CLEANUP
+        for (let [id, speaker] of Object.entries(speakers)) {
+          let panner = audio.createPanner();
+          panner.panningModel = 'HRTF';
+          panner.coneOuterGain = 0.1;
+          panner.coneOuterAngle = 180;
+          panner.coneInnerAngle = 0;
+          panner.setPosition(speaker.x, speaker.y, -0.5);
+          panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
+
+          panner.connect(audio.destination);
+          players[id].speaker = speaker;
+          players[id].panner = panner;
+        }
       })
 
       socket.on('join', (id) => {
@@ -407,15 +452,28 @@ function main() {
         players[id] = {code: "0"};
         createViewer(id);
         createScopes(id);
+
+        let panner = audio.createPanner();
+        panner.panningModel = 'HRTF';
+        panner.coneOuterGain = 0.1;
+        panner.coneOuterAngle = 180;
+        panner.coneInnerAngle = 0;
+
+        panner.connect(audio.destination);
+        players[id].speaker = {x: 0, y: 0, angle: 0};
+        players[id].panner = panner;
+        field.render();
       });
 
       socket.on('leave', (id) => {
         console.log('leave', id)
         stopAudio(id);
+        players[id].panner.disconnect();
         for (let element of players[id].elements) {
           element.remove();
         }
         delete players[id];
+        field.render();
       });
 
       socket.on('code', ({id, code}) => {
@@ -442,51 +500,52 @@ function main() {
         doc.setCursor(cursor);
         doc.setSelections(selections);
       })
+
+      socket.on('speaker', ({id, state: {x, y, angle}}) => {
+        players[id].panner.setPosition(x, y, -0.5);
+        players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+        players[id].speaker = {x, y, angle};
+        field.render();
+      })
   });
 
-  if (window.AudioContext !== undefined && window.AudioWorkletNode !== undefined) {
-    const unsupportedEl = document.getElementById("unsupported");
-    if (unsupportedEl !== null) { unsupportedEl.remove(); }
+  // Later, might want to create a new merger to grow input channels dynamically,
+  // rather than commiting to a max size here.
+  merger = audio.createChannelMerger(8);
+  outputNode = audio.createGain(0.1);
+  outputNode.connect(audio.destination);
+  createScopes("me");
+  createEditor();
 
-    CustomAudioNode = class CustomAudioNode extends AudioWorkletNode {
-      constructor(audioContext, processorName) {
-        super(audioContext, processorName, {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [1]
-        });
-      }
-    };
+  let panner = audio.createPanner();
+  panner.panningModel = 'HRTF';
+  panner.coneOuterGain = 0.1;
+  panner.coneOuterAngle = 180;
+  panner.coneInnerAngle = 0;
 
-    audio = new AudioContext();
-    resumeContextOnInteraction(audio);
-    // Later, might want to create a new merger to grow input channels dynamically,
-    // rather than commiting to a max size here.
-    merger = audio.createChannelMerger(8);
-    outputNode = audio.createGain(0.1);
-    outputNode.connect(audio.destination);
-    createScopes("me");
-    createEditor();
+  panner.connect(audio.destination);
+  // Position the listener at the origin.
+  audio.listener.setPosition(0, 0, 0);
+  players["me"].panner = panner;
 
-    let panner = audio.createPanner();
-    panner.panningModel = 'HRTF';
-    panner.coneOuterGain = 0.1;
-    panner.coneOuterAngle = 180;
-    panner.coneInnerAngle = 0;
+  let callback = ({x, y, angle}) => {
+    panner.setPosition(x, y, -0.5);
+    panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+    speakerPos = {x, y, angle};
+  }
+  field = new Field(document.getElementById("test-canvas"), callback);
 
-    panner.connect(audio.destination);
-    // Position the listener at the origin.
-    audio.listener.setPosition(0, 0, 0);
-    players["me"].panner = panner;
-
-    let callback = ({x, y, angle}) => {
-      panner.setPosition(x, y, -0.5);
-      panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+  function sendSpeakerState() {
+    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+    if (JSON.stringify(speakerPos) !== JSON.stringify(lastSentSpeakerPos)) {
+      console.log("sending speaker updates", speakerPos);
+      socket.emit('speaker', speakerPos);
+      lastSentSpeakerPos = speakerPos;
     }
-    let field = new Field(document.getElementById("test-canvas"), callback);
+    setTimeout(sendSpeakerState, 200);
   }
 
-  updateClock();
+  sendSpeakerState();
 }
 
 function ready(fn) {
@@ -496,24 +555,6 @@ function ready(fn) {
     document.addEventListener("DOMContentLoaded", fn);
   }
 }
-
-
-// Forked from https://webaudioapi.com/samples/spatialized/spatialized-sample.js, original license included here:
-/*
- * Copyright 2013 Boris Smus. All Rights Reserved.
-
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 
 // Draws a canvas and tracks mouse click/drags on the canvas.
@@ -546,6 +587,17 @@ function Field(canvas, callback) {
   this.callback = callback;
 }
 
+function getSpeakers() {
+  let foo = [];
+  if (speakerPos)
+    foo.push(["me", speakerPos]);
+  for (let [id, player] of Object.entries(players)) {
+    if (id !== "me" && player.speaker)
+      foo.push([id, player.speaker]);
+  }
+  return foo;
+}
+
 Field.prototype.render = function() {
   // Draw points onto the canvas element.
   var ctx = this.canvas.getContext('2d');
@@ -558,11 +610,16 @@ Field.prototype.render = function() {
   ctx.restore();
   ctx.fill();
 
-  for (let speaker of this.speakers) {
+  let speakers = getSpeakers();
+  for (let [id, speaker] of speakers) {
+    let x = speaker.x / 2 * this.canvas.width + this.center.x;
+    let y = speaker.y / 2 * this.canvas.height + this.center.y;
     // Draw it rotated.
     ctx.save();
-    ctx.translate(speaker.x, speaker.y);
+    ctx.translate(x, y);
     ctx.rotate(speaker.angle);
+    ctx.font = '16px sans-serif';
+    ctx.fillText(id, -20, -10);
     ctx.translate(-this.speakerIcon.width/2, -this.speakerIcon.height/2);
     ctx.drawImage(this.speakerIcon, 0, 0);
     ctx.restore();
