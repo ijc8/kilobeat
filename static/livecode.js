@@ -153,7 +153,7 @@ function getCode(userCode, processorName) {
       const numFrames = out.length;
       for (let i = 0; i < numFrames; i++) {
         ${generateNames()}
-        out[i] = ${userCode};
+        out[i] = Math.max(-1, Math.min(1, ${userCode}));
         t += 1 / sampleRate;
       }
       return true;
