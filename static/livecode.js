@@ -126,11 +126,21 @@ function getCode(userCode, processorName) {
     }).join('\n');
   }
 
+  function exportMath() {
+    let names = ['abs', 'cbrt', 'clz32', 'imul', 'max', 'min', 'pow', 'sign', 'sqrt',
+                 'exp', 'expm1', 'log', 'log1p', 'log10', 'log2',
+                 'ceil', 'floor', 'fround', 'round', 'trunc',
+                 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'atan2',
+                 'cos', 'cosh', 'hypot', 'sin', 'sinh', 'tan', 'tanh'];
+    let aliases = {"rand": "random", "e": "E", "pi": "PI"};
+    return names.map(name => `let ${name} = Math.${name}`)
+                .concat(Object.entries(aliases).map(([alias, name]) => `let ${alias} = Math.${name}`))
+                .join(';');
+  }
+
   return `
   let t = 0;
-  let pi = Math.PI;
-  let sin = Math.sin;
-  let rand = Math.random;
+  ${exportMath()}
   let x = 0, y = 0, z = 0;
 
   // These are still up for debate.
