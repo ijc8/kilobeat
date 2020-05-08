@@ -153,7 +153,8 @@ function getCode(userCode, processorName) {
       const numFrames = out.length;
       for (let i = 0; i < numFrames; i++) {
         ${generateNames()}
-        out[i] = Math.max(-1, Math.min(1, ${userCode}));
+        let sample = ${userCode};
+        out[i] = Math.max(-1, Math.min(1, sample));
         t += 1 / sampleRate;
       }
       return true;
@@ -413,26 +414,25 @@ function main() {
 }
 
 function more_main() {
+  document.getElementById("status").innerHTML = "Connecting to server...";
   console.log("status", audio.state);
   socket = io();
   socket.on('connect', function() {
       console.log("connected!");
-      socket.on('hello', ({id, players: current_players, speakers, time}) => {
+      socket.on('hello', ({id, players: current_players, time}) => {
         startTime = Date.now() / 1000 - time;
         console.log('hello: I am', id, 'and there are', current_players);
         players[id] = players["me"];
         document.getElementById("status").innerHTML = `You are player ${id}.`
         document.getElementById("player-id").innerHTML = `You (${id})`
         console.log(current_players);
-        for (let [id, code] of Object.entries(current_players)) {
-          players[id] = {code: code};
-          console.log(id, players);
+        for (let {id, code, speaker} of current_players) {
+          players[id] = {code, speaker};
+          console.log(id, code, speaker);
           createViewer(id);
           createScopes(id);
           runCode(id);
-        }
-        // TODO CLEANUP
-        for (let [id, speaker] of Object.entries(speakers)) {
+
           let panner = audio.createPanner();
           panner.panningModel = 'HRTF';
           panner.coneOuterGain = 0.1;
@@ -440,9 +440,7 @@ function more_main() {
           panner.coneInnerAngle = 0;
           panner.setPosition(speaker.x, speaker.y, -0.5);
           panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
-
           panner.connect(audio.destination);
-          players[id].speaker = speaker;
           players[id].panner = panner;
         }
       })

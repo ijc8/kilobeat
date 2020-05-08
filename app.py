@@ -1,17 +1,29 @@
-from flask import Flask, request, render_template, url_for
+from flask import Flask, request, render_template, url_for, json
 from flask_socketio import SocketIO, emit
 import time
 
+
+class Player:
+    def __init__(self, id):
+        self.id = id
+        self.code = '0'
+        self.speaker = {'x': 0, 'y': 0, 'angle': 0}
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Player):
+            return o.__dict__
+        return super().default(o)
+
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
-player_count = 0
+app.json_encoder = CustomJSONEncoder
+socketio = SocketIO(app, json=json)
 
-sid_player_map = {}
-# TODO: obviously, combine these maps into one
-player_sid_map = {}
-player_code = {}
-player_speaker = {}
+sid_map = {}
+player_map = {}
 
 start_time = time.time()
 
@@ -22,32 +34,28 @@ def index(path):
 
 @socketio.on('connect')
 def connect():
-    global player_count
+    id = len(player_map)
     print('connect', request.sid)
-    emit('hello', {'id': player_count, 'players': player_code, 'speakers': player_speaker, 'time': time.time() - start_time})
-    emit('join', player_count, broadcast=True, include_self=False)
-    player_sid_map[player_count] = request.sid
-    sid_player_map[request.sid] = player_count
-    player_code[player_count] = '0'
-    player_speaker[player_count] = {'x': 0, 'y': 0, 'angle': 0}
-    player_count += 1
+    emit('hello', {'id': id, 'players': list(player_map.values()), 'time': time.time() - start_time})
+    emit('join', id, broadcast=True, include_self=False)
+    player = Player(id)
+    player_map[id] = player
+    sid_map[request.sid] = player
 
 @socketio.on('disconnect')
 def disconnect():
     print('disconnect', request.sid)
-    id = sid_player_map[request.sid]
+    id = sid_map[request.sid].id
     emit('leave', id, broadcast=True, include_self=False)
-    del player_speaker[id]
-    del player_code[id]
-    del player_sid_map[id]
-    del sid_player_map[request.sid]
+    del player_map[id]
+    del sid_map[request.sid]
 
 @socketio.on('code')
 def handle_code(code):
-    id = sid_player_map[request.sid]
-    print('received code', code, 'from', id)
-    player_code[id] = code
-    emit('code', {'code': code, 'id': sid_player_map[request.sid]}, broadcast=True, include_self=False)
+    player = sid_map[request.sid]
+    print('received code', code, 'from', player.id)
+    player.code = code
+    emit('code', {'code': code, 'id': player.id}, broadcast=True, include_self=False)
 
 @socketio.on('reset')
 def handle_reset():
@@ -57,13 +65,13 @@ def handle_reset():
 
 @socketio.on('editor')
 def handle_editor(state):
-    emit('editor', {'state': state, 'id': sid_player_map[request.sid]}, broadcast=True, include_self=False)
+    emit('editor', {'state': state, 'id': sid_map[request.sid].id}, broadcast=True, include_self=False)
 
 @socketio.on('speaker')
 def handle_speaker(state):
-    id = sid_player_map[request.sid]
-    player_speaker[id] = state
-    emit('speaker', {'state': state, 'id': id}, broadcast=True, include_self=False)
+    player = sid_map[request.sid]
+    player.speaker = state
+    emit('speaker', {'state': state, 'id': player.id}, broadcast=True, include_self=False)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8765)
