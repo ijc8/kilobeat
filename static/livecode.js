@@ -233,116 +233,88 @@ function runCode(id) {
   runAudioWorklet(id, url, processorName);
 }
 
-function createEditor() {
-  const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
-
-  const runKeys = isMac ? "Cmd-Enter" : "Ctrl-Enter";
-  const runButton = createButton("Run ");
-  runButton.classList.add("run");
-  addKeyCommandToButton(runButton, runKeys);
-
-  function runEditorCode(editor) {
-    const userCode = editor.getDoc().getValue();
-    players["me"].code = userCode;
-    socket.emit("code", userCode);
-    runCode("me");
-  }
-
-  function playAudio(editor) {
-    runEditorCode(editor);
-  }
-
-  // code mirror
-  const editorWrap = document.getElementById("editor");
-  players["me"].editorContainer = editorWrap;
-  if (editorWrap === null) { return; }
-  const editor = CodeMirror(editorWrap, {
-    mode: "javascript",
-    value: presets[0].code,
-    lineNumbers: false,
-    lint: { esversion: 6 },
-    viewportMargin: Infinity,
-    tabSize: 2,
-    scrollbarStyle: null
-  });
-
-  document.addEventListener("keydown", event => {
-    const isModDown = isMac ? event.metaKey : event.ctrlKey;
-
-    if (!isModDown) { return; }
-
-    const isEnter = event.code === "Enter";
-    const isPeriod = event.code === "Period";
-
-    if (isEnter || isPeriod) { event.preventDefault(); }
-
-    if (isEnter)  {
-      playAudio(editor);
-      runButton.classList.add("down");
-      setTimeout(() => {
-        if (runButton.classList.contains("down")) {
-          runButton.classList.remove("down");
-        }
-      }, 200);
-    }
-  });
-
-  const controlsEl = document.getElementById("controls");
-  if (controlsEl !== null) {
-    controlsEl.appendChild(runButton);
-    runButton.addEventListener("click", () => playAudio(editor));
-
-    let doc = editor.getDoc();
-    presets.forEach(preset => {
-      const button = createButton(preset.name);
-      button.addEventListener("click", () => doc.setValue(preset.code));
-      const presetsEl = document.getElementById("presets");
-      if (presetsEl !== null) { presetsEl.appendChild(button); }
-    });
-  }
-
-  let resetButton = createButton("Reset");
-  // Currently will *not* reset the timers in AudioWorkers.
-  resetButton.addEventListener("click", () => socket.emit("reset"));
-  document.getElementById("clock").appendChild(resetButton);
-}
-
-function createViewer(id) {
+function createEditor(id, isLocal) {
   let parent = document.getElementById("main");
-  let id_box = document.createElement('div');
-  id_box.id = `p${id}-id`
-  id_box.classList.add('player-id');
-  id_box.innerHTML = `Player ${id}`;
-  let view = document.createElement('div');
-  view.id = `p${id}-code`;
-  view.classList.add("editor");
-  const editor = CodeMirror(view, {
+  // Create containing elements.
+  let nameBox = document.createElement('div');
+  nameBox.id = `p${id}-id`
+  nameBox.classList.add('player-id');
+  // TODO alternate string for 'You' case, perhaps.
+  nameBox.innerHTML = `Player ${id}`;
+  let editorWrap = document.createElement('div')
+  editorWrap.id = `p${id}-code`;
+  editorWrap.classList.add("editor");
+
+  // Create CodeMirror editor.
+  const editor = CodeMirror(editorWrap, {
     mode: "javascript",
     value: players[id].code,
     lineNumbers: false,
     lint: { esversion: 6 },
     viewportMargin: Infinity,
     tabSize: 2,
-    readOnly: true,
+    readOnly: !isLocal,
     scrollbarStyle: null,
   });
+  // TODO: Check if this is still necessary.
   setTimeout(() => editor.refresh(), 0);
-  console.log(players);
-  players[id].editor = editor;
-  let copy = createButton("Copy 📄");
-  copy.addEventListener('click', () => navigator.clipboard.writeText(players[id].code));
-  copy.classList.add("run");
+
+  let button;
+  if (isLocal) {
+    // For local editors, create a Run button.
+    const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
+
+    const runKeys = isMac ? "Cmd-Enter" : "Ctrl-Enter";
+    const runButton = createButton("Run ");
+    runButton.classList.add("run");
+    addKeyCommandToButton(runButton, runKeys);
+
+    function runEditorCode(editor) {
+      const userCode = editor.getDoc().getValue();
+      players["me"].code = userCode;
+      socket.emit("code", userCode);
+      runCode("me");
+    }
+
+    button = runButton;
+    runButton.addEventListener("click", () => runEditorCode(editor));
+
+    if (id === "me") {
+      // For the moment, the Run shortcut always runs the "player's" snippet.
+      // TODO: Revisit this behavior for offline mode.
+      document.addEventListener("keydown", event => {
+        const isModDown = isMac ? event.metaKey : event.ctrlKey;
+        if (!isModDown) { return; }
+        const isEnter = event.code === "Enter";
+        if (isEnter)  {
+          event.preventDefault();
+          runEditorCode(editor);
+          runButton.classList.add("down");
+          setTimeout(() => {
+            if (runButton.classList.contains("down")) runButton.classList.remove("down");
+          }, 200);
+        }
+      });
+    }
+  } else {
+    // For remote editors, create a Copy button.
+    let copy = createButton("Copy 📄");
+    copy.addEventListener('click', () => navigator.clipboard.writeText(players[id].code));
+    copy.classList.add("run");
+    button = copy;
+  }
 
   let scopes = document.createElement('div')
   scopes.id = `p${id}-scopes`
   scopes.classList.add('scopes');
-  players[id].editorContainer = view;
-  players[id].elements = [id_box, view, copy, scopes];
-  parent.appendChild(id_box);
-  parent.appendChild(view);
-  parent.appendChild(copy);
+  players[id].editor = editor;
+  players[id].editorContainer = editorWrap;
+  players[id].elements = [nameBox, editorWrap, button, scopes];
+  parent.appendChild(nameBox);
+  parent.appendChild(editorWrap);
+  parent.appendChild(button);
   parent.appendChild(scopes);
-};
+}
 
 function createScopes(id) {
   const scopesContainer = document.getElementById(`p${id}-scopes`);
@@ -407,98 +379,98 @@ function main() {
 function connect() {
   document.getElementById("status").innerHTML = "Connecting to server...";
   socket = io(); // TODO add destination here
-  socket.on('connect', function() {
+  socket.on('connect', () => {
       document.getElementById("connect-box").hidden = true;
       document.getElementById("disconnect-box").hidden = false;
-
       console.log("connected!");
-      socket.on('hello', ({id, players: current_players, time}) => {
-        startTime = Date.now() / 1000 - time;
-        console.log('hello: I am', id, 'and there are', current_players);
-        players[id] = players["me"];
-        document.getElementById("status").innerHTML = `You are player ${id}.`
-        document.getElementById("player-id").innerHTML = `You (${id})`
-        console.log(current_players);
-        for (let {id, code, speaker} of current_players) {
-          players[id] = {code, speaker};
-          console.log(id, code, speaker);
-          createViewer(id);
-          createScopes(id);
-          runCode(id);
+  });
 
-          let panner = audio.createPanner();
-          panner.panningModel = 'HRTF';
-          panner.coneOuterGain = 0.1;
-          panner.coneOuterAngle = 180;
-          panner.coneInnerAngle = 0;
-          panner.setPosition(speaker.x, speaker.y, -0.5);
-          panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
-          panner.connect(audio.destination);
-          players[id].panner = panner;
-        }
-      })
+  // TODO refactor so that we can retrigger these events in replay.
+  socket.on('hello', ({id, players: current_players, time}) => {
+    startTime = Date.now() / 1000 - time;
+    console.log('hello: I am', id, 'and there are', current_players);
+    players[id] = players["me"];
+    document.getElementById("status").innerHTML = `You are player ${id}.`
+    document.getElementById("player-id").innerHTML = `You (${id})`
+    console.log(current_players);
+    for (let {id, code, speaker} of current_players) {
+      players[id] = {code, speaker};
+      console.log(id, code, speaker);
+      createEditor(id, false);
+      createScopes(id);
+      runCode(id);
 
-      // Is there any need to register these events in here?
-      socket.on('join', (id) => {
-        console.log('join', id)
-        players[id] = {code: "0"};
-        createViewer(id);
-        createScopes(id);
+      let panner = audio.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.coneOuterGain = 0.1;
+      panner.coneOuterAngle = 180;
+      panner.coneInnerAngle = 0;
+      panner.setPosition(speaker.x, speaker.y, -0.5);
+      panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
+      panner.connect(audio.destination);
+      players[id].panner = panner;
+    }
+  });
 
-        let panner = audio.createPanner();
-        panner.panningModel = 'HRTF';
-        panner.coneOuterGain = 0.1;
-        panner.coneOuterAngle = 180;
-        panner.coneInnerAngle = 0;
+  socket.on('join', (id) => {
+    console.log('join', id)
+    players[id] = {code: "0"};
+    createEditor(id, false);
+    createScopes(id);
 
-        panner.connect(audio.destination);
-        players[id].speaker = {x: 0, y: 0, angle: 0};
-        players[id].panner = panner;
-        field.render();
-      });
+    let panner = audio.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.coneOuterGain = 0.1;
+    panner.coneOuterAngle = 180;
+    panner.coneInnerAngle = 0;
 
-      socket.on('leave', (id) => {
-        console.log('leave', id)
-        stopAudio(id);
-        players[id].panner.disconnect();
-        for (let element of players[id].elements) {
-          element.remove();
-        }
-        delete players[id];
-        field.render();
-      });
+    panner.connect(audio.destination);
+    players[id].speaker = {x: 0, y: 0, angle: 0};
+    players[id].panner = panner;
+    field.render();
+  });
 
-      socket.on('code', ({id, code}) => {
-        players[id].code = code;
-        players[id].editor.getDoc().setValue(code);
-        runCode(id);
-      })
+  socket.on('leave', (id) => {
+    console.log('leave', id)
+    stopAudio(id);
+    players[id].panner.disconnect();
+    for (let element of players[id].elements) {
+      element.remove();
+    }
+    delete players[id];
+    field.render();
+  });
 
-      socket.on('reset', () => {
-        startTime = Date.now() / 1000;
-        clearTimeout(clockUpdate);
-        updateClock();
-        for (let player of Object.values(players)) {
-          // I wonder if there's a way to broadcast to all AudioWorkletNodes at once?
-          // Maybe they could all have a reference to one SharedArrayBuffer?
-          if (player.customNode)
-            player.customNode.port.postMessage(getTime());
-        }
-      })
+  socket.on('code', ({id, code}) => {
+    players[id].code = code;
+    players[id].editor.getDoc().setValue(code);
+    runCode(id);
+  });
 
-      socket.on('editor', ({id, state: {cursor, selections, content}}) => {
-        let doc = players[id].editor.getDoc();
-        doc.setValue(content);
-        doc.setCursor(cursor);
-        doc.setSelections(selections);
-      })
+  socket.on('reset', () => {
+    startTime = Date.now() / 1000;
+    clearTimeout(clockUpdate);
+    updateClock();
+    for (let player of Object.values(players)) {
+      // I wonder if there's a way to broadcast to all AudioWorkletNodes at once?
+      // Maybe they could all have a reference to one SharedArrayBuffer?
+      if (player.customNode)
+        player.customNode.port.postMessage(getTime());
+    }
+  });
 
-      socket.on('speaker', ({id, state: {x, y, angle}}) => {
-        players[id].panner.setPosition(x, y, -0.5);
-        players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
-        players[id].speaker = {x, y, angle};
-        field.render();
-      })
+  socket.on('editor', ({id, state: {cursor, selections, content}}) => {
+    let doc = players[id].editor.getDoc();
+    doc.setValue(content);
+    doc.setCursor(cursor);
+    doc.setSelections(selections);
+  });
+
+  socket.on('speaker', ({id, state: {x, y, angle}}) => {
+    players[id].panner.setPosition(x, y, -0.5);
+    players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+    players[id].speaker = {x, y, angle};
+    field.render();
   });
 
   function sendSpeakerState() {
@@ -542,8 +514,9 @@ function audio_ready() {
   merger = audio.createChannelMerger(8);
   outputNode = audio.createGain(0.1);
   outputNode.connect(audio.destination);
+  players["me"].code = "0";
+  createEditor("me", true);
   createScopes("me");
-  createEditor();
 
   let panner = audio.createPanner();
   panner.panningModel = 'HRTF';
@@ -564,6 +537,20 @@ function audio_ready() {
   field = new Field(document.getElementById("test-canvas"), callback);
 
   document.getElementById("connect-btn").addEventListener("click", connect);
+
+  // Setup presets.
+  presets.forEach(preset => {
+    const button = createButton(preset.name);
+    const doc = players["me"].editor.getDoc();
+    button.addEventListener("click", () => doc.setValue(preset.code));
+    document.getElementById("presets").appendChild(button);
+  });
+
+  // Setup reset button.
+  let resetButton = createButton("Reset");
+  // Currently will *not* reset the timers in AudioWorkers.
+  resetButton.addEventListener("click", () => socket.emit("reset"));
+  document.getElementById("clock").appendChild(resetButton);
 }
 
 function ready(fn) {
