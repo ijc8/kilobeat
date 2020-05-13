@@ -1,5 +1,4 @@
 /* global CodeMirror, AudioWorkletNode */
-
 import { Scope } from "./Scope.js";
 
 let audio;
@@ -22,6 +21,13 @@ let field;
 let localIDs = 0;
 let isRecording = false;
 let recordLog;
+let handlers = {};
+
+// Wrappers that deal with the server in online mode, AND deal with recordings in recording/playback mode.
+
+function on(event, callback) {
+  handlers[event] = callback;
+}
 
 function emit(id, event, obj) {
   if (isRecording) {
@@ -419,6 +425,46 @@ function main() {
   updateClock();
 }
 
+function resetClock() {
+  startTime = Date.now() / 1000;
+  clearTimeout(clockUpdate);
+  updateClock();
+  for (let player of Object.values(players)) {
+    // I wonder if there's a way to broadcast to all AudioWorkletNodes at once?
+    // Maybe they could all have a reference to one SharedArrayBuffer?
+    if (player.customNode)
+      player.customNode.port.postMessage(getTime());
+  }
+}
+
+function handleEvent(event, obj) {
+  console.log('handleEvent', event, obj);
+  handlers[event](obj);
+}
+
+function playRecording(recording) {
+  // For now we'll just schedule everything in advance.
+  resetClock();
+  for (let id of Object.keys(players)) {
+    deletePlayer(id);
+  }
+  createPlayer("me", true);
+  players[recording.players[0]] = players["me"];
+  for (let id of recording.players.slice(1)) {
+    createPlayer(id, true);
+  }
+
+  let t = 0;
+  for (let [timestamp, event, obj] of recording.events) {
+    t = timestamp * 1000;
+    setTimeout(() => handleEvent(event, obj), t);
+  }
+  setTimeout(() => {
+    console.log("playback finished");
+    document.getElementById("play-input").value = '';
+  }, t);
+}
+
 function connect() {
   document.getElementById("status").innerHTML = "Connecting to server...";
   socket = io(); // TODO add destination here
@@ -470,23 +516,7 @@ function connect() {
     field.render();
   });
 
-  socket.on('code', ({id, state: code}) => {
-    players[id].code = code;
-    players[id].editor.getDoc().setValue(code);
-    runCode(id);
-  });
-
-  socket.on('reset', () => {
-    startTime = Date.now() / 1000;
-    clearTimeout(clockUpdate);
-    updateClock();
-    for (let player of Object.values(players)) {
-      // I wonder if there's a way to broadcast to all AudioWorkletNodes at once?
-      // Maybe they could all have a reference to one SharedArrayBuffer?
-      if (player.customNode)
-        player.customNode.port.postMessage(getTime());
-    }
-  });
+  socket.on('reset', resetClock);
 
   socket.on('editor', ({id, state: {cursor, selections, content}}) => {
     let doc = players[id].editor.getDoc();
@@ -501,6 +531,11 @@ function connect() {
     players[id].speaker = {x, y, angle};
     field.render();
   });
+
+  // Register any other handlers (which are also used for playback).
+  for (let [event, callback] of handlers) {
+    socket.on(event, callback);
+  }
 
   function sendSpeakerState() {
     const speaker = players["me"].speaker;
@@ -587,7 +622,6 @@ function audio_ready() {
   let playInput = document.getElementById("play-input");
   let recordingBtn = document.getElementById("toggle-recording-btn");
   playBtn.addEventListener("click", () => {
-    console.log("TODO")
     playInput.click();
   });
   playInput.addEventListener("change", () => {
@@ -595,6 +629,7 @@ function audio_ready() {
     reader.onload = () => {
       const text = reader.result;
       console.log(text);
+      playRecording(JSON.parse(text));
     };
     reader.readAsText(playInput.files[0]);
   })
@@ -602,10 +637,27 @@ function audio_ready() {
     isRecording = !isRecording;
     recordingBtn.textContent = isRecording ? "Stop Recording" : "Start Recording";
     if (isRecording) {
+      resetClock();
       recordLog = [];
     } else {
-      download("recording.kb", JSON.stringify(recordLog));
+      // Indicate which player is "me" by sticking it in the list first.
+      let ids = [];
+      for (let [id, player] of Object.entries(players)) {
+        if (id === "me") continue;
+        if (player == players["me"])
+          ids.unshift(id);
+        else
+          ids.push(id);
+      }
+      const recording = {players: ids, events: recordLog};
+      download("recording.kb", JSON.stringify(recording));
     }
+  });
+
+  on('code', ({id, state: code}) => {
+    players[id].code = code;
+    players[id].editor.getDoc().setValue(code);
+    runCode(id);
   });
 }
 
