@@ -70,22 +70,17 @@ function resumeContextOnInteraction(audioContext) {
   if (audioContext.state === "suspended") {
     const resume = async () => {
       await audioContext.resume();
-
       if (audioContext.state === "running") {
         document.body.removeEventListener("touchend", resume, false);
         document.body.removeEventListener("click", resume, false);
         document.body.removeEventListener("keydown", resume, false);
       }
-
-      console.log("status", audio.state);
       audio_ready();
     };
-
     document.body.addEventListener("touchend", resume, false);
     document.body.addEventListener("click", resume, false);
     document.body.addEventListener("keydown", resume, false);
   } else {
-    console.log("status", audio.state);
     audio_ready();
   }
 }
@@ -197,16 +192,6 @@ function runAudioWorklet(id, workletUrl, processorName) {
 function createButton(text) {
   const button = document.createElement("button");
   button.textContent = text;
-  const onMouseUp = () => {
-    button.classList.remove("down");
-    document.removeEventListener("mouseup", onMouseUp, false);
-  };
-  const onMouseDown = () => {
-    button.classList.add("down");
-    document.addEventListener("mouseup", onMouseUp, false);
-  };
-
-  button.addEventListener("mousedown", onMouseDown);
   return button;
 }
 
@@ -271,9 +256,10 @@ function createEditor(id, isLocal) {
 
     function runEditorCode(editor) {
       const userCode = editor.getDoc().getValue();
-      players["me"].code = userCode;
-      socket.emit("code", userCode);
-      runCode("me");
+      players[id].code = userCode;
+      if (id === "me" && socket != null)
+        socket.emit("code", userCode);
+      runCode(id);
     }
 
     button = runButton;

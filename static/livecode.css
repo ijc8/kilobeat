@@ -43,32 +43,13 @@ button:focus {
   outline: none;
 }
 
-button.down {
-  box-shadow: 2px 2px black;
-}
-
-button.down,
-button.active {
+button:active:hover {
   transform: translate(2px, 2px);
   box-shadow: 2px 2px rgb(200, 200, 200);
 }
 
-button.active:hover {
+button:active:hover {
   box-shadow: 2px 2px black;
-}
-
-button.down.active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px black;
-}
-
-button.toggle {
-  opacity: 0.5;
-}
-
-button.toggle.down,
-button.toggle.active {
-  opacity: 1.0
 }
 
 button.run {
@@ -83,7 +64,7 @@ button.run:focus {
   border-color: rgb(43, 156, 212);
 }
 
-button.run.down {
+button.run:active:hover {
   box-shadow: 2px 2px rgb(43, 156, 212);
 }
 
