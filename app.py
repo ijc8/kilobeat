@@ -21,6 +21,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 app.json_encoder = CustomJSONEncoder
 socketio = SocketIO(app, json=json)
+player_count = 0
 
 sid_map = {}
 player_map = {}
@@ -34,7 +35,9 @@ def index(path):
 
 @socketio.on('connect')
 def connect():
-    id = len(player_map)
+    global player_count
+    id = player_count
+    player_count += 1
     print('connect', request.sid)
     emit('hello', {'id': id, 'players': list(player_map.values()), 'time': time.time() - start_time})
     emit('join', id, broadcast=True, include_self=False)
