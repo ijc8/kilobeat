@@ -2,7 +2,7 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// Map of id => {customNode, panner, channel, editor, editorContainer, elements, scopes}
+// Map of id => {customNode, panner, channel, editor, editorContainer, lastEditorState, elements, scopes, isLocal}
 // (Maybe it's time to make a real class?)
 let players = {};
 let CustomAudioNode;
@@ -13,13 +13,13 @@ let clockUpdate;
 let outputNode;
 
 let socket = null;
-let lastSent;
 let merger;
 
 let lastSentSpeakerPos;
 let field;
 let localIDs = 0;
 let isRecording = false;
+let isPlaying = false;
 let recordLog;
 let handlers = {};
 
@@ -30,13 +30,19 @@ function on(event, callback) {
 }
 
 function emit(id, event, obj) {
-  if (isRecording) {
-    recordLog.push([getTime(), event, {id: id, state: obj}]);
-    console.log(recordLog);
-  }
+  console.log('emit', id, event, obj);
+  handleEvent(event, {id: id, state: obj});
   if (id === "me" && socket !== null) {
     socket.emit(event, obj);
   }
+}
+
+function handleEvent(event, obj) {
+  console.log('handleEvent', event, obj);
+  if (isRecording) {
+    recordLog.push([getTime(), event, obj]);
+  }
+  handlers[event](obj);
 }
 
 function download(filename, text) {
@@ -235,7 +241,7 @@ function addKeyCommandToButton(button, keyCommand) {
 function runCode(id) {
   const processorName = `processor-${id}-${processorCount++}`;
   const code = getCode(players[id].code, processorName);
-  console.log("Generated code", code);
+  // console.log("Generated code", code);
   const blob = new Blob([code], { type: "application/javascript" });
   const url = window.URL.createObjectURL(blob);
 
@@ -252,9 +258,8 @@ function createEditor(id, isLocal) {
   let nameBox = document.createElement('div');
   nameBox.id = `p${id}-id`
   nameBox.classList.add('player-id');
-  nameBox.innerHTML = id === "me" ? "You" : `p${id}`;
   if (id === "me") {
-    nameBox.innerHTML = "You";
+    nameBox.innerHTML = "You (p0)";
   } else {
     nameBox.innerHTML = `p${id}`;
     if (isLocal) {
@@ -295,9 +300,7 @@ function createEditor(id, isLocal) {
 
     function runEditorCode(editor) {
       const userCode = editor.getDoc().getValue();
-      players[id].code = userCode;
       emit(id, "code", userCode);
-      runCode(id);
     }
 
     button = runButton;
@@ -379,7 +382,11 @@ function createScopes(id) {
 }
 
 function createPlayer(id, isLocal) {
-  players[id] = {code: "0"};
+  players[id] = {
+    code: "0",
+    isLocal: isLocal,
+    lastEditorState: null,
+  };
   createEditor(id, isLocal);
   createScopes(id);
 
@@ -437,17 +444,14 @@ function resetClock() {
   }
 }
 
-function handleEvent(event, obj) {
-  console.log('handleEvent', event, obj);
-  handlers[event](obj);
-}
-
 function playRecording(recording) {
   // For now we'll just schedule everything in advance.
   resetClock();
   for (let id of Object.keys(players)) {
     deletePlayer(id);
   }
+  isPlaying = true;
+  document.getElementById("play-input").disabled = true;
   createPlayer("me", true);
   players[recording.players[0]] = players["me"];
   for (let id of recording.players.slice(1)) {
@@ -462,6 +466,8 @@ function playRecording(recording) {
   setTimeout(() => {
     console.log("playback finished");
     document.getElementById("play-input").value = '';
+    isPlaying = false;
+    document.getElementById("play-input").disabled = false;
   }, t);
 }
 
@@ -518,13 +524,6 @@ function connect() {
 
   socket.on('reset', resetClock);
 
-  socket.on('editor', ({id, state: {cursor, selections, content}}) => {
-    let doc = players[id].editor.getDoc();
-    doc.setValue(content);
-    doc.setCursor(cursor);
-    doc.setSelections(selections);
-  });
-
   socket.on('speaker', ({id, state: {x, y, angle}}) => {
     players[id].panner.setPosition(x, y, -0.5);
     players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
@@ -549,26 +548,6 @@ function connect() {
   }
 
   sendSpeakerState();
-
-  // Minor optimization: only set this off after seeing cursorActivity.
-  function sendEditorState() {
-    let doc = players["me"].editor.getDoc();
-    // Might want to strip out irrelevant info, like selection stickiness and xRel.
-    let editorState = {
-      cursor: doc.getCursor(),
-      selections: doc.listSelections(),
-      content: doc.getValue()
-    };
-    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
-    if (JSON.stringify(editorState) !== JSON.stringify(lastSent)) {
-      console.log("sending updates", editorState);
-      socket.emit('editor', editorState);
-      lastSent = editorState;
-    }
-    setTimeout(sendEditorState, 200);
-  }
-
-  sendEditorState();
 }
 
 function audio_ready() {
@@ -659,6 +638,41 @@ function audio_ready() {
     players[id].editor.getDoc().setValue(code);
     runCode(id);
   });
+
+  on('editor', ({id, state: {cursor, selections, content}}) => {
+    // For local events that aren't in playback, don't mess with the doc - it just gave us these values.
+    if (!players[id].isLocal || isPlaying) {
+      let doc = players[id].editor.getDoc();
+      doc.setValue(content);
+      doc.setCursor(cursor);
+      doc.setSelections(selections);
+    }
+  });
+
+  // Minor optimization: only set this off after seeing cursorActivity.
+  function sendEditorState() {
+    if (isPlaying)
+      return;
+    for (let [id, player] of Object.entries(players)) {
+      if (!player.isLocal) continue;
+      if (player == players["me"] && id !== "me") continue;
+      let doc = player.editor.getDoc();
+      // Might want to strip out irrelevant info, like selection stickiness and xRel.
+      let editorState = {
+        cursor: doc.getCursor(),
+        selections: doc.listSelections(),
+        content: doc.getValue()
+      };
+      // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+      if (JSON.stringify(editorState) !== JSON.stringify(player.lastEditorState)) {
+        emit(id, 'editor', editorState);
+        player.lastEditorState = editorState;
+      }
+      setTimeout(sendEditorState, 200);
+    }
+  }
+
+  sendEditorState();
 }
 
 function ready(fn) {
