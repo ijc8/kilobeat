@@ -221,7 +221,6 @@ function createEditor(id, isLocal) {
   let nameBox = document.createElement('div');
   nameBox.id = `p${id}-id`
   nameBox.classList.add('player-id');
-  // TODO alternate string for 'You' case, perhaps.
   nameBox.innerHTML = id === "me" ? "You" : `p${id}`;
   if (id === "me") {
     nameBox.innerHTML = "You";
@@ -407,15 +406,26 @@ function connect() {
 
   // TODO refactor so that we can retrigger these events in replay.
   socket.on('hello', ({id, players: current_players, time}) => {
-    // TODO destroy any extra offline players that are hanging around; reset localIDs.
+    for (let [id, player] of Object.entries(players)) {
+      if (player !== players["me"]) {
+        deletePlayer(id);
+      } else if (id !== "me") {
+        // This is the local alias for me. Don't delete the player, just the alias!
+        // TODO: whe we disconnect, recreate the alias with the reset localIDs.
+        delete players[id];
+      }
+    }
+    localIDs = 0;
+
     startTime = Date.now() / 1000 - time;
     console.log('hello: I am', id, 'and there are', current_players);
     players[id] = players["me"];
-    document.getElementById("status").innerHTML = `You are player ${id}.`
-    document.getElementById("player-id").innerHTML = `You (${id})`
+    document.getElementById("status").innerHTML = `Connected. You are player ${id}.`
+    document.getElementById("pme-id").innerHTML = `You (p${id})`
     console.log(current_players);
     for (let {id, code, speaker} of current_players) {
       createPlayer(id, false);
+      players[id].code = code;
       players[id].editor.getDoc().setValue(code);
       runCode(id);
       players[id].panner.setPosition(speaker.x, speaker.y, -0.5);
@@ -480,9 +490,9 @@ function connect() {
 
   sendSpeakerState();
 
-  // TODO fix
   // Minor optimization: only set this off after seeing cursorActivity.
   function sendEditorState() {
+    let doc = players["me"].editor.getDoc();
     // Might want to strip out irrelevant info, like selection stickiness and xRel.
     let editorState = {
       cursor: doc.getCursor(),
