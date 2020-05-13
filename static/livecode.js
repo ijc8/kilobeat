@@ -5,7 +5,7 @@ import { Scope } from "./Scope.js";
 let audio;
 // Map of id => {customNode, panner, channel, editor, editorContainer, elements, scopes}
 // (Maybe it's time to make a real class?)
-let players = {me: {elements: []}};
+let players = {};
 let CustomAudioNode;
 let processorCount = 0;
 // This is replaced when we connect to the server.
@@ -17,8 +17,9 @@ let socket = null;
 let lastSent;
 let merger;
 
-let speakerPos, lastSentSpeakerPos;
+let lastSentSpeakerPos;
 let field;
+let localIDs = 0;
 
 function getTime() {
   return Date.now() / 1000 - startTime;
@@ -59,10 +60,6 @@ const presets = [
     name: "Rhythm",
     code: `t < x ? (t - x) : (x = t + choice(.6,.3,.2,.1), 0)`
   },
-  /*{
-    name: "c o m p u t e r m u s i c",
-    code: `(sin(2*pi*y*t)+sin(2*pi*z*t))/2*(t<x?(t-x):(x=t+.2,y=rand()*500+500,z=rand()*1000+500,0))`
-  }*/
 ];
 
 function resumeContextOnInteraction(audioContext) {
@@ -340,6 +337,22 @@ function createScopes(id) {
   loop();
 }
 
+function createPlayer(id, isLocal) {
+  players[id] = {code: "0"};
+  createEditor(id, isLocal);
+  createScopes(id);
+
+  let panner = audio.createPanner();
+  panner.panningModel = 'HRTF';
+  panner.coneOuterGain = 0.1;
+  panner.coneOuterAngle = 180;
+  panner.coneInnerAngle = 0;
+
+  panner.connect(audio.destination);
+  players[id].speaker = {x: 0, y: 0, angle: 0};
+  players[id].panner = panner;
+}
+
 function main() {
   if (window.AudioContext !== undefined && window.AudioWorkletNode !== undefined) {
     const unsupportedEl = document.getElementById("unsupported");
@@ -373,6 +386,7 @@ function connect() {
 
   // TODO refactor so that we can retrigger these events in replay.
   socket.on('hello', ({id, players: current_players, time}) => {
+    // TODO destroy any extra offline players that are hanging around; reset localIDs.
     startTime = Date.now() / 1000 - time;
     console.log('hello: I am', id, 'and there are', current_players);
     players[id] = players["me"];
@@ -380,39 +394,17 @@ function connect() {
     document.getElementById("player-id").innerHTML = `You (${id})`
     console.log(current_players);
     for (let {id, code, speaker} of current_players) {
-      players[id] = {code, speaker};
-      console.log(id, code, speaker);
-      createEditor(id, false);
-      createScopes(id);
+      createPlayer(id, false);
+      players[id].editor.getDoc().setValue(code);
       runCode(id);
-
-      let panner = audio.createPanner();
-      panner.panningModel = 'HRTF';
-      panner.coneOuterGain = 0.1;
-      panner.coneOuterAngle = 180;
-      panner.coneInnerAngle = 0;
-      panner.setPosition(speaker.x, speaker.y, -0.5);
-      panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
-      panner.connect(audio.destination);
-      players[id].panner = panner;
+      players[id].panner.setPosition(speaker.x, speaker.y, -0.5);
+      players[id].panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
     }
   });
 
   socket.on('join', (id) => {
     console.log('join', id)
-    players[id] = {code: "0"};
-    createEditor(id, false);
-    createScopes(id);
-
-    let panner = audio.createPanner();
-    panner.panningModel = 'HRTF';
-    panner.coneOuterGain = 0.1;
-    panner.coneOuterAngle = 180;
-    panner.coneInnerAngle = 0;
-
-    panner.connect(audio.destination);
-    players[id].speaker = {x: 0, y: 0, angle: 0};
-    players[id].panner = panner;
+    createPlayer(id);
     field.render();
   });
 
@@ -460,11 +452,12 @@ function connect() {
   });
 
   function sendSpeakerState() {
+    const speaker = players["me"].speaker;
     // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
-    if (JSON.stringify(speakerPos) !== JSON.stringify(lastSentSpeakerPos)) {
-      console.log("sending speaker updates", speakerPos);
-      socket.emit('speaker', speakerPos);
-      lastSentSpeakerPos = speakerPos;
+    if (JSON.stringify(speaker) !== JSON.stringify(lastSentSpeakerPos)) {
+      console.log("sending speaker updates", speaker);
+      socket.emit('speaker', speaker);
+      lastSentSpeakerPos = speaker;
     }
     setTimeout(sendSpeakerState, 200);
   }
@@ -500,25 +493,20 @@ function audio_ready() {
   merger = audio.createChannelMerger(8);
   outputNode = audio.createGain(0.1);
   outputNode.connect(audio.destination);
-  players["me"].code = "0";
-  createEditor("me", true);
-  createScopes("me");
-
-  let panner = audio.createPanner();
-  panner.panningModel = 'HRTF';
-  panner.coneOuterGain = 0.1;
-  panner.coneOuterAngle = 180;
-  panner.coneInnerAngle = 0;
-
-  panner.connect(audio.destination);
   // Position the listener at the origin.
   audio.listener.setPosition(0, 0, 0);
-  players["me"].panner = panner;
+
+  // Create the default player.
+  // In offline mode, this is just the first of potentially many local players.
+  // In online mode, this is the only local player.
+  createPlayer("me", true);
+  players[localIDs++] = players["me"];
+  const panner = players["me"].panner;
 
   let callback = ({x, y, angle}) => {
     panner.setPosition(x, y, -0.5);
     panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
-    speakerPos = {x, y, angle};
+    players["me"].speaker = {x, y, angle};
   }
   field = new Field(document.getElementById("test-canvas"), callback);
 
@@ -537,6 +525,10 @@ function audio_ready() {
   // Currently will *not* reset the timers in AudioWorkers.
   resetButton.addEventListener("click", () => socket.emit("reset"));
   document.getElementById("clock").appendChild(resetButton);
+
+  // Setup add process button.
+  let addProcessBtn = document.getElementById("add-process-btn");
+  addProcessBtn.addEventListener("click", () => createPlayer(localIDs++, true));
 }
 
 function ready(fn) {
@@ -580,11 +572,8 @@ function Field(canvas, callback) {
 
 function getSpeakers() {
   let foo = [];
-  if (speakerPos)
-    foo.push(["me", speakerPos]);
   for (let [id, player] of Object.entries(players)) {
-    if (id !== "me" && player.speaker)
-      foo.push([id, player.speaker]);
+    foo.push([id, player.speaker]);
   }
   return foo;
 }
