@@ -13,7 +13,7 @@ let startTime = Date.now() / 1000;
 let clockUpdate;
 let outputNode;
 
-let socket;
+let socket = null;
 let lastSent;
 let merger;
 
@@ -28,7 +28,6 @@ function updateClock() {
   document.getElementById("clock-display").value = Math.floor(getTime());
   clockUpdate = setTimeout(updateClock, 500);
 }
-
 
 const presets = [
   {
@@ -79,7 +78,7 @@ function resumeContextOnInteraction(audioContext) {
       }
 
       console.log("status", audio.state);
-      more_main();
+      audio_ready();
     };
 
     document.body.addEventListener("touchend", resume, false);
@@ -87,7 +86,7 @@ function resumeContextOnInteraction(audioContext) {
     document.body.addEventListener("keydown", resume, false);
   } else {
     console.log("status", audio.state);
-    more_main();
+    audio_ready();
   }
 }
 
@@ -267,26 +266,6 @@ function createEditor() {
     scrollbarStyle: null
   });
 
-  let doc = editor.getDoc();
-  // Minor optimization: only set this off after seeing cursorActivity.
-  function sendEditorState() {
-    // Might want to strip out irrelevant info, like selection stickiness and xRel.
-    let editorState = {
-      cursor: doc.getCursor(),
-      selections: doc.listSelections(),
-      content: doc.getValue()
-    };
-    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
-    if (JSON.stringify(editorState) !== JSON.stringify(lastSent)) {
-      console.log("sending updates", editorState);
-      socket.emit('editor', editorState);
-      lastSent = editorState;
-    }
-    setTimeout(sendEditorState, 200);
-  }
-
-  sendEditorState();
-
   document.addEventListener("keydown", event => {
     const isModDown = isMac ? event.metaKey : event.ctrlKey;
 
@@ -313,6 +292,7 @@ function createEditor() {
     controlsEl.appendChild(runButton);
     runButton.addEventListener("click", () => playAudio(editor));
 
+    let doc = editor.getDoc();
     presets.forEach(preset => {
       const button = createButton(preset.name);
       button.addEventListener("click", () => doc.setValue(preset.code));
@@ -424,11 +404,13 @@ function main() {
   updateClock();
 }
 
-function more_main() {
+function connect() {
   document.getElementById("status").innerHTML = "Connecting to server...";
-  console.log("status", audio.state);
-  socket = io();
+  socket = io(); // TODO add destination here
   socket.on('connect', function() {
+      document.getElementById("connect-box").hidden = true;
+      document.getElementById("disconnect-box").hidden = false;
+
       console.log("connected!");
       socket.on('hello', ({id, players: current_players, time}) => {
         startTime = Date.now() / 1000 - time;
@@ -456,6 +438,7 @@ function more_main() {
         }
       })
 
+      // Is there any need to register these events in here?
       socket.on('join', (id) => {
         console.log('join', id)
         players[id] = {code: "0"};
@@ -518,6 +501,42 @@ function more_main() {
       })
   });
 
+  function sendSpeakerState() {
+    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+    if (JSON.stringify(speakerPos) !== JSON.stringify(lastSentSpeakerPos)) {
+      console.log("sending speaker updates", speakerPos);
+      socket.emit('speaker', speakerPos);
+      lastSentSpeakerPos = speakerPos;
+    }
+    setTimeout(sendSpeakerState, 200);
+  }
+
+  sendSpeakerState();
+
+  // TODO fix
+  // Minor optimization: only set this off after seeing cursorActivity.
+  function sendEditorState() {
+    // Might want to strip out irrelevant info, like selection stickiness and xRel.
+    let editorState = {
+      cursor: doc.getCursor(),
+      selections: doc.listSelections(),
+      content: doc.getValue()
+    };
+    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+    if (JSON.stringify(editorState) !== JSON.stringify(lastSent)) {
+      console.log("sending updates", editorState);
+      socket.emit('editor', editorState);
+      lastSent = editorState;
+    }
+    setTimeout(sendEditorState, 200);
+  }
+
+  sendEditorState();
+}
+
+function audio_ready() {
+  document.getElementById("status").innerHTML = "You are offline. To play with others, join a server.";
+
   // Later, might want to create a new merger to grow input channels dynamically,
   // rather than commiting to a max size here.
   merger = audio.createChannelMerger(8);
@@ -544,17 +563,7 @@ function more_main() {
   }
   field = new Field(document.getElementById("test-canvas"), callback);
 
-  function sendSpeakerState() {
-    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
-    if (JSON.stringify(speakerPos) !== JSON.stringify(lastSentSpeakerPos)) {
-      console.log("sending speaker updates", speakerPos);
-      socket.emit('speaker', speakerPos);
-      lastSentSpeakerPos = speakerPos;
-    }
-    setTimeout(sendSpeakerState, 200);
-  }
-
-  sendSpeakerState();
+  document.getElementById("connect-btn").addEventListener("click", connect);
 }
 
 function ready(fn) {
