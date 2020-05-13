@@ -222,7 +222,19 @@ function createEditor(id, isLocal) {
   nameBox.id = `p${id}-id`
   nameBox.classList.add('player-id');
   // TODO alternate string for 'You' case, perhaps.
-  nameBox.innerHTML = `Player ${id}`;
+  nameBox.innerHTML = id === "me" ? "You" : `p${id}`;
+  if (id === "me") {
+    nameBox.innerHTML = "You";
+  } else {
+    nameBox.innerHTML = `p${id}`;
+    if (isLocal) {
+      const removeBtn = document.createElement("span");
+      removeBtn.classList.add("remove-process");
+      removeBtn.innerText = "❌";
+      removeBtn.addEventListener("click", () => deletePlayer(id));
+      nameBox.prepend(removeBtn);
+    }
+  }
   let editorWrap = document.createElement('div')
   editorWrap.id = `p${id}-code`;
   editorWrap.classList.add("editor");
@@ -342,7 +354,7 @@ function createPlayer(id, isLocal) {
   createEditor(id, isLocal);
   createScopes(id);
 
-  let panner = audio.createPanner();
+  const panner = audio.createPanner();
   panner.panningModel = 'HRTF';
   panner.coneOuterGain = 0.1;
   panner.coneOuterAngle = 180;
@@ -351,6 +363,15 @@ function createPlayer(id, isLocal) {
   panner.connect(audio.destination);
   players[id].speaker = {x: 0, y: 0, angle: 0};
   players[id].panner = panner;
+}
+
+function deletePlayer(id) {
+  stopAudio(id);
+  players[id].panner.disconnect();
+  for (let element of players[id].elements) {
+    element.remove();
+  }
+  delete players[id];
 }
 
 function main() {
@@ -410,12 +431,7 @@ function connect() {
 
   socket.on('leave', (id) => {
     console.log('leave', id)
-    stopAudio(id);
-    players[id].panner.disconnect();
-    for (let element of players[id].elements) {
-      element.remove();
-    }
-    delete players[id];
+    deletePlayer(id);
     field.render();
   });
 

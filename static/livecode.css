@@ -142,6 +142,7 @@ button.run:active:hover {
   text-align: center;
   font-size: 20px;
   line-height: 50px;
+  position: relative;
 }
 
 .editor {
@@ -188,4 +189,15 @@ button.run:active:hover {
 
 canvas {
   border: solid 1px black;
+}
+
+.remove-process {
+  position: absolute;
+  cursor: pointer;
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  padding: 12px 16px;
+  transform: translate(0%, -50%);
+  filter: grayscale(1) contrast(1.5) opacity(0.5);
 }
