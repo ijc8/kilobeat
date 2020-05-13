@@ -58,7 +58,7 @@ def handle_code(code):
     player = sid_map[request.sid]
     print('received code', code, 'from', player.id)
     player.code = code
-    emit('code', {'code': code, 'id': player.id}, broadcast=True, include_self=False)
+    emit('code', {'state': code, 'id': player.id}, broadcast=True, include_self=False)
 
 @socketio.on('reset')
 def handle_reset():

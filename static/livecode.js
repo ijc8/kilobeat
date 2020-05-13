@@ -21,6 +21,17 @@ let lastSentSpeakerPos;
 let field;
 let localIDs = 0;
 let isRecording = false;
+let recordLog;
+
+function emit(id, event, obj) {
+  if (isRecording) {
+    recordLog.push([getTime(), event, {id: id, state: obj}]);
+    console.log(recordLog);
+  }
+  if (id === "me" && socket !== null) {
+    socket.emit(event, obj);
+  }
+}
 
 function download(filename, text) {
   var element = document.createElement('a');
@@ -279,8 +290,7 @@ function createEditor(id, isLocal) {
     function runEditorCode(editor) {
       const userCode = editor.getDoc().getValue();
       players[id].code = userCode;
-      if (id === "me" && socket != null)
-        socket.emit("code", userCode);
+      emit(id, "code", userCode);
       runCode(id);
     }
 
@@ -460,7 +470,7 @@ function connect() {
     field.render();
   });
 
-  socket.on('code', ({id, code}) => {
+  socket.on('code', ({id, state: code}) => {
     players[id].code = code;
     players[id].editor.getDoc().setValue(code);
     runCode(id);
@@ -574,14 +584,27 @@ function audio_ready() {
 
   // Setup play, recording buttons.
   let playBtn = document.getElementById("play-btn");
+  let playInput = document.getElementById("play-input");
   let recordingBtn = document.getElementById("toggle-recording-btn");
-  playBtn.addEventListener("click", () => console.log("TODO"));
-  recordingBtn.addEventListener("click", () => {
+  playBtn.addEventListener("click", () => {
     console.log("TODO")
+    playInput.click();
+  });
+  playInput.addEventListener("change", () => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      console.log(text);
+    };
+    reader.readAsText(playInput.files[0]);
+  })
+  recordingBtn.addEventListener("click", () => {
     isRecording = !isRecording;
     recordingBtn.textContent = isRecording ? "Stop Recording" : "Start Recording";
-    if (!isRecording) {
-      download("recording.kb", "foo bar\nbaz")
+    if (isRecording) {
+      recordLog = [];
+    } else {
+      download("recording.kb", JSON.stringify(recordLog));
     }
   });
 }
