@@ -142,6 +142,7 @@ function getCode(userCode, processorName) {
   let t = 0;
   ${exportMath()}
   let x = 0, y = 0, z = 0;
+  let now = ${getTime()};
 
   // These are still up for debate.
   let s = x => sin(2*pi*x);
