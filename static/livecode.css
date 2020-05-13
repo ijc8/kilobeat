@@ -158,12 +158,14 @@ button.run:active:hover {
   display: grid;
   font-size: 12px;
   grid-template-columns: 1fr 1fr;
+  height: 0;
 }
 
 .scopes .scope {
   box-sizing: border-box;
   border: 1px black solid;
   min-height: 50px;
+  min-width: 0;
   position: relative;
 }
 
@@ -200,4 +202,22 @@ canvas {
   padding: 12px 16px;
   transform: translate(0%, -50%);
   filter: grayscale(1) contrast(1.5) opacity(0.5);
+}
+
+#connect-box, #disconnect-box {
+  margin-bottom: 20px;
+}
+
+#server-address {
+  background: white;
+  border: 1px black solid;
+  box-sizing: border-box;
+  font-size: 20px;
+  padding-left: 10px;
+  font-family: monospace;
+  height: 50px;
+}
+
+#add-process-btn {
+  margin-top: 20px;
 }

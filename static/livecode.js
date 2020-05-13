@@ -401,6 +401,7 @@ function connect() {
   socket.on('connect', () => {
       document.getElementById("connect-box").hidden = true;
       document.getElementById("disconnect-box").hidden = false;
+      document.getElementById("add-process-btn").hidden = true;;
       console.log("connected!");
   });
 
@@ -537,6 +538,7 @@ function audio_ready() {
   field = new Field(document.getElementById("test-canvas"), callback);
 
   document.getElementById("connect-btn").addEventListener("click", connect);
+  document.getElementById("disconnect-btn").addEventListener("click", () => console.log("Disconnect: not implemented (just refresh)."));
 
   // Setup presets.
   presets.forEach(preset => {
@@ -599,7 +601,9 @@ function Field(canvas, callback) {
 function getSpeakers() {
   let foo = [];
   for (let [id, player] of Object.entries(players)) {
-    foo.push([id, player.speaker]);
+    // Don't push this player twice.
+    if (player !== players["me"] || id === "me")
+      foo.push([id, player.speaker]);
   }
   return foo;
 }
