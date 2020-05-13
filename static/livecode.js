@@ -1,3 +1,4 @@
+// Starter code and styling from https://github.com/acarabott/audio-dsp-playground by Arthur Carabott (MIT License).
 /* global CodeMirror, AudioWorkletNode */
 import { Scope } from "./Scope.js";
 
@@ -78,28 +79,48 @@ const presets = [
   },
   {
     name: "Noise",
-    code: `rand() * 2 - 1`
+    code: `(rand()*2-1)`
   },
   {
     name: "Sine",
-    code: `sin(2 * pi * 400 * t)`
+    code: `sin(2*pi*400*t)`
   },
   // Note that Sawtooth and Square here have DC bias.
   {
     name: "Sawtooth",
-    code: `(t % .005) / .005`
+    code: `(t%.005)/.005`
   },
   {
     name: "Square",
-    code: `(t % .005) > .0025`
+    code: `((t%.005)>.0025)`
+  },
+  {
+    name: "AM",
+    code: `sin(2*pi*400*t)*sin(2*pi*200*t)`
+  },
+  {
+    name: "PM",
+    code: `sin(2*pi*400*t+sin(2*pi*200*t))`
   },
   {
     name: "Chord",
     code: `[300,500,800].map(f=>sin(2*pi*f*t)).reduce((a,b)=>a+b)/3`
   },
   {
+    name: "Sequence",
+    code: `[.3,.4,.5][floor(t % 3)]`
+  },
+  {
     name: "Rhythm",
-    code: `t < x ? (t - x) : (x = t + choice(.6,.3,.2,.1), 0)`
+    code: `(t<x?(t-x):(x=t+choice(.6,.3,.2,.1),0))`
+  },
+  {
+    name: "Timer",
+    code: `(t-now<5)`
+  },
+  {
+    name: "Ramp",
+    code: `min(t-now,1)`
   },
 ];
 
@@ -396,7 +417,7 @@ function createPlayer(id, isLocal) {
   panner.coneOuterAngle = 180;
   panner.coneInnerAngle = 0;
 
-  panner.connect(audio.destination);
+  panner.connect(outputNode);
   players[id].speaker = {x: 0, y: 0, angle: 0};
   players[id].panner = panner;
 }
@@ -485,12 +506,22 @@ function playRecording(recording) {
 
 function connect() {
   document.getElementById("status").innerHTML = "Connecting to server...";
-  socket = io(); // TODO add destination here
+  socket = io(document.getElementById("server-address").value);
   socket.on('connect', () => {
       document.getElementById("connect-box").hidden = true;
       document.getElementById("disconnect-box").hidden = false;
       document.getElementById("add-process-btn").hidden = true;;
       console.log("connected!");
+  });
+
+  socket.on('connect_error', () => {
+    document.getElementById("status").innerHTML = "Connection error.";
+    socket.close();
+  });
+
+  socket.on('connect_timeout', () => {
+    document.getElementById("status").innerHTML = "Connection timeout.";
+    socket.close();
   });
 
   // TODO refactor so that we can retrigger these events in replay.
@@ -530,7 +561,7 @@ function connect() {
   socket.on('reset', resetClock);
 
   // Register any other handlers (which are also used for playback).
-  for (let [event, callback] of handlers) {
+  for (let [event, callback] of Object.entries(handlers)) {
     socket.on(event, callback);
   }
 }
@@ -541,7 +572,8 @@ function audio_ready() {
   // Later, might want to create a new merger to grow input channels dynamically,
   // rather than commiting to a max size here.
   merger = audio.createChannelMerger(8);
-  outputNode = audio.createGain(0.1);
+  outputNode = audio.createGain();
+  outputNode.gain.value = 0.2;
   outputNode.connect(audio.destination);
   // Position the listener at the origin.
   audio.listener.setPosition(0, 0, 0);
@@ -628,9 +660,9 @@ function audio_ready() {
     }
   });
 
-  on('code', ({id, state: code}) => {
-    players[id].code = code;
-    players[id].editor.getDoc().setValue(code);
+  on('code', ({id, state}) => {
+    players[id].code = state;
+    players[id].editor.getDoc().setValue(state);
     runCode(id);
   });
 
@@ -745,10 +777,10 @@ function Field(canvas, callback) {
   });
 
   this.listenerIcon = new Image();
-  this.listenerIcon.src = 'static/headphones.svg';
+  this.listenerIcon.src = 'headphones.svg';
 
   this.speakerIcon = new Image();
-  this.speakerIcon.src = 'static/speaker.svg';
+  this.speakerIcon.src = 'speaker.svg';
 
   // Render the scene when the icon has loaded.
   var ctx = this;
