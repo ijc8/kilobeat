@@ -675,8 +675,8 @@ function audio_ready() {
         emit(id, 'editor', editorState);
         player.lastEditorState = editorState;
       }
-      setTimeout(sendEditorState, 200);
     }
+    setTimeout(sendEditorState, 200);
   }
 
   sendEditorState();
