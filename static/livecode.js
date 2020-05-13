@@ -23,6 +23,11 @@ let isPlaying = false;
 let recordLog;
 let handlers = {};
 
+let selectedPlayer = 0;
+
+// For using Cmd vs. Ctrl keys:
+const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
+
 // Wrappers that deal with the server in online mode, AND deal with recordings in recording/playback mode.
 
 function on(event, callback) {
@@ -139,7 +144,7 @@ function stopAudio(id) {
     merger.disconnect(players[id].customNode);
     players[id].channel = null;
     players[id].customNode.disconnect();
-    players[id].customNode = undefined;
+    players[id].customNode = null;
   }
 }
 
@@ -239,16 +244,19 @@ function addKeyCommandToButton(button, keyCommand) {
 }
 
 function runCode(id) {
+  // Trigger CSS animation.
+  // TODO debug hitching
+  players[id].editorContainer.classList.add("ran");
+  setTimeout(() => {
+    players[id].editorContainer.classList.remove("ran");
+  }, 100);
+
   const processorName = `processor-${id}-${processorCount++}`;
   const code = getCode(players[id].code, processorName);
   // console.log("Generated code", code);
   const blob = new Blob([code], { type: "application/javascript" });
   const url = window.URL.createObjectURL(blob);
 
-  // Trigger CSS animation.
-  players[id].editorContainer.classList.add("ran");
-  setTimeout(() => players[id].editorContainer.classList.remove("ran"), 100);
-  console.log("runCode", id, players[id].code, processorName);
   runAudioWorklet(id, url, processorName);
 }
 
@@ -291,8 +299,6 @@ function createEditor(id, isLocal) {
   let button;
   if (isLocal) {
     // For local editors, create a Run button.
-    const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
-
     const runKeys = isMac ? "Cmd-Enter" : "Ctrl-Enter";
     const runButton = createButton("Run ");
     runButton.classList.add("run");
@@ -305,24 +311,6 @@ function createEditor(id, isLocal) {
 
     button = runButton;
     runButton.addEventListener("click", () => runEditorCode(editor));
-
-    if (id === "me") {
-      // For the moment, the Run shortcut always runs the "player's" snippet.
-      // TODO: Revisit this behavior for offline mode.
-      document.addEventListener("keydown", event => {
-        const isModDown = isMac ? event.metaKey : event.ctrlKey;
-        if (!isModDown) { return; }
-        const isEnter = event.code === "Enter";
-        if (isEnter)  {
-          event.preventDefault();
-          runEditorCode(editor);
-          runButton.classList.add("down");
-          setTimeout(() => {
-            if (runButton.classList.contains("down")) runButton.classList.remove("down");
-          }, 200);
-        }
-      });
-    }
   } else {
     // For remote editors, create a Copy button.
     let copy = createButton("Copy 📄");
@@ -341,6 +329,17 @@ function createEditor(id, isLocal) {
   parent.appendChild(editorWrap);
   parent.appendChild(button);
   parent.appendChild(scopes);
+
+  if (isLocal) {
+    for (let element of players[id].elements) {
+      element.addEventListener('click', () => {
+        if (players[selectedPlayer])
+          players[selectedPlayer].editorContainer.classList.remove('selected');
+        selectedPlayer = id;
+        editorWrap.classList.add('selected');
+      });
+    }
+  }
 }
 
 function createScopes(id) {
@@ -493,6 +492,7 @@ function connect() {
       }
     }
     localIDs = 0;
+    selectedPlayer = id;
 
     startTime = Date.now() / 1000 - time;
     console.log('hello: I am', id, 'and there are', current_players);
@@ -569,9 +569,13 @@ function audio_ready() {
   const panner = players["me"].panner;
 
   let callback = ({x, y, angle}) => {
+    // This method of choosing which speaker to move is a little annoying,
+    // but it'll do for now.
+    if (!players[selectedPlayer]) return;
+    let panner = players[selectedPlayer].panner;
     panner.setPosition(x, y, -0.5);
     panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
-    players["me"].speaker = {x, y, angle};
+    players[selectedPlayer].speaker = {x, y, angle};
   }
   field = new Field(document.getElementById("test-canvas"), callback);
 
@@ -581,8 +585,11 @@ function audio_ready() {
   // Setup presets.
   presets.forEach(preset => {
     const button = createButton(preset.name);
-    const doc = players["me"].editor.getDoc();
-    button.addEventListener("click", () => doc.setValue(preset.code));
+    button.addEventListener("click", () => {
+      if (!players[selectedPlayer]) return;
+      let doc = players[selectedPlayer].editor.getDoc();
+      doc.setValue(preset.code);
+    });
     document.getElementById("presets").appendChild(button);
   });
 
@@ -673,6 +680,25 @@ function audio_ready() {
   }
 
   sendEditorState();
+
+  // Run shortcut: run the selected player's snippet.
+  document.addEventListener("keydown", event => {
+    if (!players[selectedPlayer]) return;
+    const isModDown = isMac ? event.metaKey : event.ctrlKey;
+    if (!isModDown) { return; }
+    const isEnter = event.code === "Enter";
+    if (isEnter)  {
+      event.preventDefault();
+      emit(selectedPlayer, "code", players[selectedPlayer].editor.getDoc().getValue());
+      // TODO no magic indices
+      const runButton = players[selectedPlayer].elements[2];
+      console.log('hey', runButton);
+      runButton.classList.add("down");
+      setTimeout(() => {
+        if (runButton.classList.contains("down")) runButton.classList.remove("down");
+      }, 200);
+    }
+  });
 }
 
 function ready(fn) {
@@ -689,6 +715,7 @@ function Field(canvas, callback) {
   this.ANGLE_STEP = 0.2;
   this.canvas = canvas;
   this.center = {x: canvas.width/2, y: canvas.height/2};
+  // TODO: just one here.
   this.speakers = [{x: 0, y: 0, angle: 0}];
 
   var obj = this;

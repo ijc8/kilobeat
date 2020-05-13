@@ -43,12 +43,8 @@ button:focus {
   outline: none;
 }
 
-button:active:hover {
+button:active:hover, button.down {
   transform: translate(2px, 2px);
-  box-shadow: 2px 2px rgb(200, 200, 200);
-}
-
-button:active:hover {
   box-shadow: 2px 2px black;
 }
 
@@ -64,7 +60,7 @@ button.run:focus {
   border-color: rgb(43, 156, 212);
 }
 
-button.run:active:hover {
+button.run:active:hover, button.run.down {
   box-shadow: 2px 2px rgb(43, 156, 212);
 }
 
@@ -182,6 +178,11 @@ button.run:active:hover {
   outline: solid 0px;
   transition: all 0.5s;
   z-index: 1;
+}
+
+.selected {
+  outline: solid 2px red;
+  transition: none;
 }
 
 .ran {
