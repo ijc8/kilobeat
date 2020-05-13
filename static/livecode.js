@@ -20,6 +20,20 @@ let merger;
 let lastSentSpeakerPos;
 let field;
 let localIDs = 0;
+let isRecording = false;
+
+function download(filename, text) {
+  var element = document.createElement('a');
+  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+  element.setAttribute('download', filename);
+
+  element.style.display = 'none';
+  document.body.appendChild(element);
+
+  element.click();
+
+  document.body.removeChild(element);
+}
 
 function getTime() {
   return Date.now() / 1000 - startTime;
@@ -557,6 +571,19 @@ function audio_ready() {
   // Setup add process button.
   let addProcessBtn = document.getElementById("add-process-btn");
   addProcessBtn.addEventListener("click", () => createPlayer(localIDs++, true));
+
+  // Setup play, recording buttons.
+  let playBtn = document.getElementById("play-btn");
+  let recordingBtn = document.getElementById("toggle-recording-btn");
+  playBtn.addEventListener("click", () => console.log("TODO"));
+  recordingBtn.addEventListener("click", () => {
+    console.log("TODO")
+    isRecording = !isRecording;
+    recordingBtn.textContent = isRecording ? "Stop Recording" : "Start Recording";
+    if (!isRecording) {
+      download("recording.kb", "foo bar\nbaz")
+    }
+  });
 }
 
 function ready(fn) {

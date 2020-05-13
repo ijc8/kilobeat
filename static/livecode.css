@@ -221,3 +221,12 @@ canvas {
 #add-process-btn {
   margin-top: 20px;
 }
+
+#session-controls {
+  display: flex;
+  justify-content: space-between;
+}
+
+[hidden] {
+  display: none;
+}
