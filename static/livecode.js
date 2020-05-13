@@ -2,7 +2,7 @@
 import { Scope } from "./Scope.js";
 
 let audio;
-// Map of id => {customNode, panner, channel, editor, editorContainer, lastEditorState, elements, scopes, isLocal}
+// Map of id => {customNode, panner, channel, editor, editorContainer, lastEditorState, elements, scopes, isLocal, speaker, lastSpeakerState}
 // (Maybe it's time to make a real class?)
 let players = {};
 let CustomAudioNode;
@@ -15,7 +15,6 @@ let outputNode;
 let socket = null;
 let merger;
 
-let lastSentSpeakerPos;
 let field;
 let localIDs = 0;
 let isRecording = false;
@@ -385,6 +384,8 @@ function createPlayer(id, isLocal) {
     code: "0",
     isLocal: isLocal,
     lastEditorState: null,
+    speaker: {x: 0, y: 0, angle: 0},
+    lastSpeakerState: null,
   };
   createEditor(id, isLocal);
   createScopes(id);
@@ -443,15 +444,24 @@ function resetClock() {
   }
 }
 
+function resetPlayers() {
+  for (let [id, player] of Object.entries(players)) {
+    if (player !== players["me"]) {
+      deletePlayer(id);
+    } else if (id !== "me") {
+      delete players[id];
+    }
+  }
+  deletePlayer("me");
+  createPlayer("me", true);
+}
+
 function playRecording(recording) {
   // For now we'll just schedule everything in advance.
   resetClock();
-  for (let id of Object.keys(players)) {
-    deletePlayer(id);
-  }
+  resetPlayers();
   isPlaying = true;
   document.getElementById("play-input").disabled = true;
-  createPlayer("me", true);
   players[recording.players[0]] = players["me"];
   for (let id of recording.players.slice(1)) {
     createPlayer(id, true);
@@ -467,6 +477,9 @@ function playRecording(recording) {
     document.getElementById("play-input").value = '';
     isPlaying = false;
     document.getElementById("play-input").disabled = false;
+    resetPlayers();
+    localIDs = 0;
+    players[localIDs++] = players["me"];
   }, t);
 }
 
@@ -482,15 +495,7 @@ function connect() {
 
   // TODO refactor so that we can retrigger these events in replay.
   socket.on('hello', ({id, players: current_players, time}) => {
-    for (let [id, player] of Object.entries(players)) {
-      if (player !== players["me"]) {
-        deletePlayer(id);
-      } else if (id !== "me") {
-        // This is the local alias for me. Don't delete the player, just the alias!
-        // TODO: whe we disconnect, recreate the alias with the reset localIDs.
-        delete players[id];
-      }
-    }
+    resetPlayers();
     localIDs = 0;
     selectedPlayer = id;
 
@@ -524,30 +529,10 @@ function connect() {
 
   socket.on('reset', resetClock);
 
-  socket.on('speaker', ({id, state: {x, y, angle}}) => {
-    players[id].panner.setPosition(x, y, -0.5);
-    players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
-    players[id].speaker = {x, y, angle};
-    field.render();
-  });
-
   // Register any other handlers (which are also used for playback).
   for (let [event, callback] of handlers) {
     socket.on(event, callback);
   }
-
-  function sendSpeakerState() {
-    const speaker = players["me"].speaker;
-    // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
-    if (JSON.stringify(speaker) !== JSON.stringify(lastSentSpeakerPos)) {
-      console.log("sending speaker updates", speaker);
-      socket.emit('speaker', speaker);
-      lastSentSpeakerPos = speaker;
-    }
-    setTimeout(sendSpeakerState, 200);
-  }
-
-  sendSpeakerState();
 }
 
 function audio_ready() {
@@ -624,6 +609,9 @@ function audio_ready() {
     recordingBtn.textContent = isRecording ? "Stop Recording" : "Start Recording";
     if (isRecording) {
       resetClock();
+      resetPlayers();
+      localIDs = 0;
+      players[localIDs++] = players["me"];
       recordLog = [];
     } else {
       // Indicate which player is "me" by sticking it in the list first.
@@ -656,6 +644,17 @@ function audio_ready() {
     }
   });
 
+  on('speaker', ({id, state: {x, y, angle}}) => {
+    // Debatable whether this `if` is good here.
+    // We probably want a more general framework for these sort of intermittent updates.
+    if (!players[id].isLocal || isPlaying) {
+      players[id].panner.setPosition(x, y, -0.5);
+      players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+      players[id].speaker = {x, y, angle};
+      field.render();
+    }
+  });
+
   // Minor optimization: only set this off after seeing cursorActivity.
   function sendEditorState() {
     if (isPlaying)
@@ -680,6 +679,24 @@ function audio_ready() {
   }
 
   sendEditorState();
+
+  function sendSpeakerState() {
+    if (isPlaying)
+      return;
+    for (let [id, player] of Object.entries(players)) {
+      if (!player.isLocal) continue;
+      if (player == players["me"] && id !== "me") continue;
+      const speaker = player.speaker;
+      // It is amazing that there is no reasonable way to compare objects (or maps) built-in to this language.
+      if (JSON.stringify(speaker) !== JSON.stringify(player.lastSpeakerState)) {
+        emit(id, 'speaker', speaker);
+        player.lastSpeakerState = speaker;
+      }
+    }
+    setTimeout(sendSpeakerState, 200);
+  }
+
+  sendSpeakerState();
 
   // Run shortcut: run the selected player's snippet.
   document.addEventListener("keydown", event => {
