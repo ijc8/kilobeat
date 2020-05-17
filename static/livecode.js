@@ -542,7 +542,7 @@ function connect() {
       players[id].editor.getDoc().setValue(code);
       runCode(id);
       players[id].panner.setPosition(speaker.x, speaker.y, -0.5);
-      players[id].panner.setOrientation(Math.cos(speaker.angle), -Math.sin(speaker.angle), 1);
+      players[id].panner.setOrientation(Math.cos(speaker.angle), Math.sin(speaker.angle), 1);
     }
   });
 
@@ -591,7 +591,7 @@ function audio_ready() {
     if (!players[selectedPlayer]) return;
     let panner = players[selectedPlayer].panner;
     panner.setPosition(x, y, -0.5);
-    panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+    panner.setOrientation(Math.cos(angle), Math.sin(angle), 1);
     players[selectedPlayer].speaker = {x, y, angle};
   }
   field = new Field(document.getElementById("test-canvas"), callback);
@@ -681,7 +681,7 @@ function audio_ready() {
     // We probably want a more general framework for these sort of intermittent updates.
     if (!players[id].isLocal || isPlaying) {
       players[id].panner.setPosition(x, y, -0.5);
-      players[id].panner.setOrientation(Math.cos(angle), -Math.sin(angle), 1);
+      players[id].panner.setOrientation(Math.cos(angle), Math.sin(angle), 1);
       players[id].speaker = {x, y, angle};
       field.render();
     }
