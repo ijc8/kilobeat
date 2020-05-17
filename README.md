@@ -31,13 +31,13 @@ The output of all expressions is clipped to the range `[-1, 1]`, so the expressi
 You can run a server with `./run.sh`; this requires some Python 3 dependencies, as listed in `requirements.txt`. Watch this space for a public server.
 
 ### Security notice
-In online mode, other players can run arbitrary Javascript in your browser. As far as I am aware this is relatively low-risk, as Javascript runs in a sandbox, the application does not request any permissions beyond playing audio, and the arbitrary Javascript is trapped inside an AudioWorklet (and thus can't call `alert()`, create cross-site requests, or access the main thread's memory).
+In online mode, other players can run arbitrary Javascript in your browser. As far as I am aware this is relatively low-risk, as JS runs in a sandbox, the application does not request any permissions beyond playing audio, and the user code is trapped inside an AudioWorklet (and thus can't call `alert()`, send HTTP requests, or access the main thread's memory). Of course, the security of all this depends on [the security of your browser](https://security.stackexchange.com/q/198780), so play with others at your own risk.
 
 ## Offline mode
 Offline mode is just like online mode, except that you can play all the instruments yourself, so to speak. That is, you can create additional offline 'players' and control their expressions and speakers, too, in addition to the one you control in online mode.
 
 ## Recording and Playback
-You can record a performance and play it back later using the buttons on the right. The recording will include all the visible details of the performance: cursor motion, edits, code execution, and speaker motion. On playback, these events are replayed and the sound is generated again. Unlike an audio recording, the audio may well be different on playback, particularly if the player's used randomness - this will be freshly generated on playback.
+You can record a performance and play it back later using the buttons on the right. The recording will include all the visible details of the performance: cursor motion, edits, code execution, and speaker motion. On playback, these events are replayed and the sound is generated again. Unlike an audio recording, the audio may well be different on playback, particularly if the player's used randomness—this will be freshly generated on playback.
 
 For demonstration, a recording (`recording.kb`) is included in this repository.
 
@@ -56,7 +56,7 @@ For demonstration, a recording (`recording.kb`) is included in this repository.
 
 ## Credits
 
-Ian Clester [ijc8.me](https://ijc8.me)
+Ian Clester — [ijc8.me](https://ijc8.me)
 
 Initial CSS styles and WebAudio code blatantly stolen from Arthur Cabott's [Audio DSP Playground](https://github.com/acarabott/audio-dsp-playground), which in turn adapted stabilized oscilloscope code from <a href="https://codepen.io/ContemporaryInsanity/pen/Mwvqpb">Ewen</a>.
 
