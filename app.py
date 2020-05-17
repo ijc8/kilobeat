@@ -20,7 +20,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 app.json_encoder = CustomJSONEncoder
-socketio = SocketIO(app, json=json)
+socketio = SocketIO(app, json=json, cors_allowed_origins='*')
 player_count = 0
 
 sid_map = {}

@@ -87,7 +87,7 @@ const presets = [
   },
   // Note that Sawtooth and Square here have DC bias.
   {
-    name: "Sawtooth",
+    name: "Saw",
     code: `(t%.005)/.005`
   },
   {
