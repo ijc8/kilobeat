@@ -2,11 +2,15 @@
 
 Networked livecoding instrument, with aleatoric recording and playback.
 
+Works best in Chrome and derivatives; Firefox support in the works.
+
 ### [Demo](https://ijc8.me/kilobeat)
 
 ![kilobeat](screenshot.png)
 
 ## Usage
+
+For a broad overview and some cultural context, [read this](https://ijc8.me/2020/05/22/kilobeat/).
 
 ### Online mode
 In online mode, each player has control over a single Javascript expression, which generates successive samples of that player's audio output. This is their instrument. Each player has one instrument, and players can see what all other players are doing as they edit and run their code. Players can also control _where_ they play their instrument using the canvas at the top: the headphones represent the listener, and each player can move their speaker by dragging (to change position) and scrolling (to change angle).
@@ -31,7 +35,7 @@ The output of all expressions is clipped to the range `[-1, 1]`, so the expressi
 You can run a server with `./run.sh`; this requires some Python 3 dependencies, as listed in `requirements.txt`. Watch this space for a public server.
 
 ### Security notice
-In online mode, other players can run arbitrary Javascript in your browser. As far as I am aware this is relatively low-risk, as JS runs in a sandbox, the application does not request any permissions beyond playing audio, and the user code is trapped inside an AudioWorklet (and thus can't call `alert()`, send HTTP requests, or access the main thread's memory). Of course, the security of all this depends on [the security of your browser](https://security.stackexchange.com/q/198780), so play with others at your own risk.
+In online mode, other players can run arbitrary Javascript in your browser. As far as I am aware this is relatively low-risk, as JS runs in a sandbox, the application does not request any permissions beyond playing audio, and the user code is trapped inside an AudioWorklet (and thus can't call `alert()`, send HTTP requests, or access the main thread's memory). That said, the security of all this depends on [the security of your browser](https://security.stackexchange.com/q/198780), so play with others at your own risk.
 
 ## Offline mode
 Offline mode is just like online mode, except that you can play all the instruments yourself, so to speak. That is, you can create additional offline 'players' and control their expressions and speakers, too, in addition to the one you control in online mode.
@@ -61,3 +65,5 @@ Ian Clester — [ijc8.me](https://ijc8.me)
 Initial CSS styles and WebAudio code blatantly stolen from Arthur Cabott's [Audio DSP Playground](https://github.com/acarabott/audio-dsp-playground), which in turn adapted stabilized oscilloscope code from <a href="https://codepen.io/ContemporaryInsanity/pen/Mwvqpb">Ewen</a>.
 
 Spatialization adapted from Boris Smus' [WebAudio demos](https://github.com/borismus/webaudioapi.com).
+
+Speaker and headset icons from [Material Design](https://material.io/).
