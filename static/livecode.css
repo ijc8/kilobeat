@@ -217,6 +217,7 @@ canvas {
   padding-left: 10px;
   font-family: monospace;
   height: 50px;
+  width: 14.5em;
 }
 
 #add-process-btn {

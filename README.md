@@ -32,7 +32,7 @@ Currently, other players' values are delayed by 128 samples, but this is likely 
 
 The output of all expressions is clipped to the range `[-1, 1]`, so the expression `5` is equivalent to `1`, and the expression `sin(2*pi*t*440)*N` will converge to a square wave as `N` approaches infinity.
 
-You can run a server with `./run.sh`; this requires some Python 3 dependencies, as listed in `requirements.txt`. Watch this space for a public server.
+You can run a server with `./run.sh`; this requires some Python 3 dependencies, as listed in `requirements.txt`. A public test server is available at [kilobeat.herokuapp.com](https://kilobeat.herokuapp.com/).
 
 ### Security notice
 In online mode, other players can run arbitrary Javascript in your browser. As far as I am aware this is relatively low-risk, as JS runs in a sandbox, the application does not request any permissions beyond playing audio, and the user code is trapped inside an AudioWorklet (and thus can't call `alert()`, send HTTP requests, or access the main thread's memory). That said, the security of all this depends on [the security of your browser](https://security.stackexchange.com/q/198780), so play with others at your own risk.
