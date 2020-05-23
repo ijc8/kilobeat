@@ -14,7 +14,7 @@ let clockUpdate;
 let outputNode;
 
 let socket = null;
-let merger;
+let merger, delay;
 
 let field;
 let localIDs = 0;
@@ -161,7 +161,7 @@ function getNextChannel() {
 
 function stopAudio(id) {
   if (players[id].customNode !== undefined) {
-    merger.disconnect(players[id].customNode);
+    delay.disconnect(players[id].customNode);
     players[id].channel = null;
     players[id].customNode.disconnect();
     players[id].customNode = null;
@@ -237,7 +237,7 @@ function runAudioWorklet(id, workletUrl, processorName) {
     // by using currentFrame and giving every worklet the same offset from it.
     customNode.port.postMessage(getTime());
 
-    merger.connect(customNode);
+    delay.connect(customNode);
     customNode.connect(players[id].panner);
     customNode.connect(players[id].analyser);
     // TODO: may wish to do this earlier (or otherwise rethink this)
@@ -572,6 +572,8 @@ function audio_ready() {
   // Later, might want to create a new merger to grow input channels dynamically,
   // rather than commiting to a max size here.
   merger = audio.createChannelMerger(8);
+  delay = audio.createDelay(128 / audio.sampleRate);
+  merger.connect(delay);
   outputNode = audio.createGain();
   outputNode.gain.value = 0.2;
   outputNode.connect(audio.destination);

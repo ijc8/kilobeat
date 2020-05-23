@@ -2,7 +2,7 @@
 
 Networked livecoding instrument, with aleatoric recording and playback.
 
-Works best in Chrome and derivatives; Firefox support in the works.
+Works in Chrome and Firefox (tested with Chromium 81, Firefox 76).
 
 ### [Demo](https://ijc8.me/kilobeat)
 
