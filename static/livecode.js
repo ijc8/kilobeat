@@ -25,6 +25,14 @@ let handlers = {};
 
 let selectedPlayer = 0;
 
+let statusText = {
+  offline: "You are offline. To play with others, join a server.",
+  connecting: "Connecting to server...",
+  connected: id => `Connected. You are player ${id}.`,
+  timeout: "Connection timeout.",
+  error: "Connection error.",
+}
+
 // For using Cmd vs. Ctrl keys:
 const isMac = CodeMirror.keyMap.default === CodeMirror.keyMap.macDefault;
 
@@ -265,7 +273,6 @@ function addKeyCommandToButton(button, keyCommand) {
 
 function runCode(id) {
   // Trigger CSS animation.
-  // TODO debug hitching
   players[id].editorContainer.classList.add("ran");
   setTimeout(() => {
     players[id].editorContainer.classList.remove("ran");
@@ -287,9 +294,9 @@ function createEditor(id, isLocal) {
   nameBox.id = `p${id}-id`
   nameBox.classList.add('player-id');
   if (id === "me") {
-    nameBox.innerHTML = "You (p0)";
+    nameBox.innerText = "You (p0)";
   } else {
-    nameBox.innerHTML = `p${id}`;
+    nameBox.innerText = `p${id}`;
     if (isLocal) {
       const removeBtn = document.createElement("span");
       removeBtn.classList.add("remove-process");
@@ -505,22 +512,22 @@ function playRecording(recording) {
 }
 
 function connect() {
-  document.getElementById("status").innerHTML = "Connecting to server...";
+  document.getElementById("status").innerText = statusText.connecting;
   socket = io(document.getElementById("server-address").value);
   socket.on('connect', () => {
       document.getElementById("connect-box").hidden = true;
+      document.getElementById("add-process-btn").hidden = true;
       document.getElementById("disconnect-box").hidden = false;
-      document.getElementById("add-process-btn").hidden = true;;
       console.log("connected!");
   });
 
   socket.on('connect_error', () => {
-    document.getElementById("status").innerHTML = "Connection error.";
+    document.getElementById("status").innerText = statusText.error;
     socket.close();
   });
 
   socket.on('connect_timeout', () => {
-    document.getElementById("status").innerHTML = "Connection timeout.";
+    document.getElementById("status").innerText = statusText.timeout;
     socket.close();
   });
 
@@ -533,8 +540,8 @@ function connect() {
     startTime = Date.now() / 1000 - time;
     console.log('hello: I am', id, 'and there are', current_players);
     players[id] = players["me"];
-    document.getElementById("status").innerHTML = `Connected. You are player ${id}.`
-    document.getElementById("pme-id").innerHTML = `You (p${id})`
+    document.getElementById("status").innerText = statusText.connected(id);
+    document.getElementById("pme-id").innerText = `You (p${id})`;
     console.log(current_players);
     for (let {id, code, speaker} of current_players) {
       createPlayer(id, false);
@@ -566,8 +573,18 @@ function connect() {
   }
 }
 
+function disconnect() {
+  socket.disconnect(true);
+  resetPlayers();
+  localIDs = 0;
+  document.getElementById("status").innerText = statusText.offline;
+  document.getElementById("disconnect-box").hidden = true;
+  document.getElementById("connect-box").hidden = false;
+  document.getElementById("add-process-btn").hidden = false;
+}
+
 function audio_ready() {
-  document.getElementById("status").innerHTML = "You are offline. To play with others, join a server.";
+  document.getElementById("status").innerText = statusText.offline;
 
   // Later, might want to create a new merger to grow input channels dynamically,
   // rather than commiting to a max size here.
@@ -599,7 +616,7 @@ function audio_ready() {
   field = new Field(document.getElementById("test-canvas"), callback);
 
   document.getElementById("connect-btn").addEventListener("click", connect);
-  document.getElementById("disconnect-btn").addEventListener("click", () => console.log("Disconnect: not implemented (just refresh)."));
+  document.getElementById("disconnect-btn").addEventListener("click", disconnect);
 
   // Setup presets.
   presets.forEach(preset => {
