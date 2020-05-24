@@ -49,7 +49,7 @@ button:active:hover, button.down {
 }
 
 button.run {
-  width: 80%;
+  margin-right: 20px;
 }
 
 button.run:hover {
@@ -74,6 +74,13 @@ button.run:active:hover, button.run.down {
   height: 30px;
 }
 
+/* oh boy */
+#clock-wrapper-wrapper {
+  margin-right: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 #clock-wrapper {
   position: relative;
 }
@@ -88,14 +95,31 @@ button.run:active:hover, button.run.down {
 #clock-display {
   height: 30px;
   box-sizing: border-box;
+  border: 1px black solid;
   text-align: right;
   font-family: monospace;
   font-size: x-large;
   width: 4em;
+  padding: 10px;
 }
 
 #clock button {
   height: 30px;
+}
+
+#volume-wrapper {
+  display: flex;
+  height: 30px;
+}
+
+#speaker-icon {
+  line-height: 30px;
+  width: 25px;
+  filter: grayscale(1);
+}
+
+#volume-slider {
+  flex-grow: 1;
 }
 
 .key-wrap {
@@ -124,7 +148,8 @@ button.run:active:hover, button.run.down {
 }
 
 #menu {
-  display: flex;
+  display: grid;
+  grid-template-columns: 5.5fr 1.5fr 2fr;
 }
 
 /* Hack. */
@@ -205,6 +230,20 @@ canvas {
   filter: grayscale(1) contrast(1.5) opacity(0.5);
 }
 
+#top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+#title {
+  font-family: 'Share Tech Mono', monospace;
+  margin-bottom: 0;
+  margin-top: 10px;
+  font-size: 42px;
+  letter-spacing: 0.2em;
+}
+
 #connect-box, #disconnect-box {
   margin-bottom: 20px;
 }
@@ -224,11 +263,16 @@ canvas {
   margin-top: 20px;
 }
 
-#session-controls {
-  display: flex;
-  justify-content: space-between;
-}
-
 [hidden] {
   display: none;
+}
+
+/* No arrows in number inputs. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
 }

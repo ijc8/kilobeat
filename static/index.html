@@ -2,10 +2,13 @@
 <html>
 <head>
   <title>kilobeat</title>
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
   <script src="lib/codemirror/codemirror.js"></script>
   <link rel="stylesheet" href="lib/codemirror/codemirror.css">
   <script src="lib/codemirror/javascript.js"></script>
-
   <script src="lib/codemirror/matchbrackets.js"></script>
   <script src="lib/codemirror/trailingspace.js"></script>
   <script src="lib/codemirror/closebrackets.js"></script>
@@ -18,6 +21,7 @@
 
   <script src="livecode.js" type="module"></script>
   <link rel="stylesheet" href="livecode.css">
+  <link rel="stylesheet" href="slider.css">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
 </head>
@@ -27,45 +31,53 @@
     <div id="unsupported">
       <h2>Your browser does not support AudioWorklet</h2>
       <p>
-        AudioWorklet is currently only available in Chrome 66+
+        AudioWorklet is currently only available in Chrome 66+ and Firefox 76+.
       </p>
     </div>
 
-    <div id="test-zone">
-      <canvas id="test-canvas" width="400" height="300"></canvas>
-    </div>
+    <div id="top">
+      <div id="top-left">
+        <h1 id="title">kilobeat</h1>
+        <hr>
 
-    <h1 id="status">Click anywhere to begin.</h1>
-    <div id="session-controls">
-      <div id="connect-box">
-        <input id="server-address" type="text" placeholder="Server address" value="kilobeat.herokuapp.com"/>
-        <button id="connect-btn">Connect</button>
-      </div>
-      <div id="disconnect-box" hidden>
-        <button id="disconnect-btn">Disconnect</button>
+        <h1 id="status">Click anywhere to begin.</h1>
+
+        <div id="connect-box">
+          <input id="server-address" type="text" placeholder="Server address" value="kilobeat.herokuapp.com"/>
+          <button id="connect-btn">Connect</button>
+        </div>
+
+        <div id="disconnect-box" hidden>
+          <button id="disconnect-btn">Disconnect</button>
+        </div>
+
+        <div id="play-record-box">
+          <button id="play-btn">Play Recording</button>
+          <input id="play-input" type="file" name="name" style="display: none;"/>
+          <button id="toggle-recording-btn">Start Recording</button>
+        </div>
       </div>
 
-      <div id="play-record-box">
-        <button id="play-btn">Play Recording</button>
-        <input id="play-input" type="file" name="name" style="display: none;"/>
-        <button id="toggle-recording-btn">Start Recording</button>
-      </div>
+      <canvas id="space-canvas" width="400" height="300"></canvas>
     </div>
 
     <div id="menu">
       <div id="presets"></div>
-      <div id="clock-wrapper">
-        <span id="clock-icon">⏱️</span>
-        <input id="clock-display" type="number" value="0" readonly />
+      <div id="clock-wrapper-wrapper">
+        <div id="clock-wrapper">
+          <span id="clock-icon">⏱️</span>
+          <input id="clock-display" type="number" value="0" readonly />
+        </div>
+        <div id="clock">
+        </div>
       </div>
-      <div id="clock">
-      </div>
+      <div id="volume-wrapper">
+        <span id="speaker-icon">🔉</span>
+        <input id="volume-slider" type="range"></div>
     </div>
     <div id="main">
     </div>
-    <div id="add-process-btn">
-      <button>+ Process</button>
-    </div>
+    <button id="add-process-btn">+ Process</button>
   </div>
 </body>
 </html>
