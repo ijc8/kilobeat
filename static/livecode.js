@@ -524,11 +524,13 @@ function connect() {
   socket.on('connect_error', () => {
     document.getElementById("status").innerText = statusText.error;
     socket.close();
+    socket = null;
   });
 
   socket.on('connect_timeout', () => {
     document.getElementById("status").innerText = statusText.timeout;
     socket.close();
+    socket = null;
   });
 
   // TODO refactor so that we can retrigger these events in replay.
@@ -575,7 +577,9 @@ function connect() {
 
 function disconnect() {
   socket.disconnect(true);
+  socket = null;
   resetPlayers();
+  resetClock();
   localIDs = 0;
   document.getElementById("status").innerText = statusText.offline;
   document.getElementById("disconnect-box").hidden = true;
@@ -644,7 +648,12 @@ function audio_ready() {
   // Setup reset button.
   let resetButton = createButton("Reset");
   // Currently will *not* reset the timers in AudioWorkers.
-  resetButton.addEventListener("click", () => socket.emit("reset"));
+  resetButton.addEventListener("click", () => {
+    if (socket)
+      socket.emit("reset")
+    else
+      resetClock();
+  });
   document.getElementById("clock").appendChild(resetButton);
 
   // Setup add process button.
