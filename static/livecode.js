@@ -209,6 +209,20 @@ function getCode(userCode, processorName) {
   let s = x => sin(2*pi*x);
   let r = rand;
 
+  let sr = sampleRate;
+  let dt = 1/sampleRate;
+
+  // Phase accumulation.
+  // Usage: acc[i](delta) accumulates its argument. Each acc[i] is a separate accumulator.
+  //        sin[i](phase) is like sin(phase), but with phase-accumulation between calls. Might change the name to 'osc'.
+  let acc = [];
+  for (let i = 0; i < 8; i++) {
+    let c = 0;
+    let f = (x) => { c += x; return c };
+    acc.push(f);
+    sin[i] = (phase) => sin(f(phase));
+  }
+
   function choice(...choices) {
     var index = Math.floor(Math.random() * choices.length);
     return choices[index];
@@ -253,6 +267,13 @@ function runAudioWorklet(id, workletUrl, processorName) {
     players[id].channel = getNextChannel();
     customNode.connect(merger, 0, players[id].channel);
     players[id].customNode = customNode;
+  }).catch(error => {
+    console.log("Error in user code:", error);
+    // Trigger CSS animation.
+    players[id].editorContainer.classList.add("error");
+    setTimeout(() => {
+      players[id].editorContainer.classList.remove("error");
+    }, 200);
   });
 }
 
@@ -702,7 +723,8 @@ function audio_ready() {
 
   on('code', ({id, state}) => {
     players[id].code = state;
-    players[id].editor.getDoc().setValue(state);
+    if (!players[id].isLocal || isPlaying)
+      players[id].editor.getDoc().setValue(state);
     runCode(id);
   });
 

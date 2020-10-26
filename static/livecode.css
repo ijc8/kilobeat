@@ -16,7 +16,8 @@ h1, h2, h3, h4, h5, h6 {
   box-sizing: border-box;
   border: 1px black solid;
   font-size: 20px;
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   width: 100%;
 }
 
@@ -214,6 +215,48 @@ button.run:active:hover, button.run.down {
   outline: solid 10px greenyellow;
   transition: all 0.1s;
 }
+
+.error {
+  outline: solid 10px red;
+  animation: shake 0.2s;
+  transform: rotate(0deg);
+  transition: all 0.1s;
+}
+
+/* Unfortunately, this somehow causes the CodeMirror editor to change height sometimes...
+
+@keyframes shake {
+10%, 50%, 90% {
+  transform: rotate(-3deg);
+}
+
+0%, 100% {
+  transform: rotate(0deg);
+}
+
+30%, 70% {
+  transform: rotate(3deg);
+}
+*/
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-2px, 0, 0);
+  }
+
+  20%, 80% {
+    transform: translate3d(4px, 0, 0);
+  }
+
+  30%, 50%, 70% {
+    transform: translate3d(-8px, 0, 0);
+  }
+
+  40%, 60% {
+    transform: translate3d(8px, 0, 0);
+  }
+}
+
 
 canvas {
   border: solid 1px black;
