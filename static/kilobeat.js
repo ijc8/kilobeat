@@ -338,6 +338,7 @@ function createEditor(id, isLocal) {
     tabSize: 2,
     readOnly: !isLocal,
     scrollbarStyle: null,
+    matchBrackets: true,
   });
   // TODO: Check if this is still necessary.
   setTimeout(() => editor.refresh(), 0);
@@ -471,6 +472,9 @@ function main() {
         });
       }
     };
+
+    document.getElementById("connect-btn").addEventListener("click", connect);
+    document.getElementById("disconnect-btn").addEventListener("click", disconnect);
 
     audio = new AudioContext();
     resumeContextOnInteraction(audio);
@@ -650,9 +654,6 @@ function audio_ready() {
   }
   field = new Field(document.getElementById("space-canvas"), callback);
 
-  document.getElementById("connect-btn").addEventListener("click", connect);
-  document.getElementById("disconnect-btn").addEventListener("click", disconnect);
-
   // Setup presets.
   presets.forEach(preset => {
     const button = createButton(preset.name);
@@ -731,8 +732,8 @@ function audio_ready() {
     if (!players[id].isLocal || isPlaying) {
       let doc = players[id].editor.getDoc();
       doc.setValue(content);
-      doc.setCursor(cursor);
-      doc.setSelections(selections);
+      doc.setCursor(cursor, null, {scroll: false});
+      doc.setSelections(selections, 0, {scroll: false});
     }
   });
 
