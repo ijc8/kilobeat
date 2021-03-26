@@ -1,5 +1,5 @@
-// Starter code and styling from https://github.com/acarabott/audio-dsp-playground by Arthur Carabott (MIT License).
 /* global CodeMirror, AudioWorkletNode */
+// Starter code and styling from https://github.com/acarabott/audio-dsp-playground by Arthur Carabott (MIT License).
 import { Scope } from "./Scope.js";
 
 let audio;
@@ -203,12 +203,9 @@ function getCode(userCode, processorName) {
   return `
   let t = 0;
   ${exportMath()}
-  let x = 0, y = 0, z = 0;
+  // Variables for the player to use and however they like.
+  let i = 0, x = 0, y = 0, z = 0;
   let now = ${getTime()};
-
-  // These are still up for debate.
-  let s = x => sin(2*pi*x);
-  let r = rand;
 
   let sr = sampleRate;
   let dt = 1/sampleRate;
@@ -218,7 +215,7 @@ function getCode(userCode, processorName) {
 
   // Phase accumulation.
   // Usage: acc[i](delta) accumulates its argument. Each acc[i] is a separate accumulator.
-  //        sin[i](phase) is like sin(phase), but with phase-accumulation between calls. Might change the name to 'osc'.
+  //        sin[i](phase) is like sin(phase), but with phase-accumulation between calls (like osc~ in Pd/MSP).
   let acc = new Array(8).fill(0);
   for (let i = 0; i < acc.length; i++) {
     sin[i] = (phase) => sin(acc[i] += phase);
@@ -241,7 +238,7 @@ function getCode(userCode, processorName) {
       for (let i = 0; i < numFrames; i++) {
         ${generateNames()}
         let sample = ${userCode};
-        out[i] = Math.max(-1, Math.min(1, sample));
+        out[i] = Math.max(-1, Math.min(1, sample)) || 0;
         t += 1 / sampleRate;
       }
       return true;
