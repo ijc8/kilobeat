@@ -183,7 +183,7 @@ function getCode(userCode, processorName) {
       if (channel === null || channel === undefined)
         return '';
       let varName = (id == "me") ? "me" : `p${id}`;
-      return `let ${varName} = inputs[0][${channel}][i];`
+      return `let ${varName} = inputs[0][${channel}]?.[i];`
     }).join('\n');
   }
 
