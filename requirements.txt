@@ -1,6 +1,6 @@
 bidict==0.21.2
 click==8.0.1
-dnspython==2.1.0
+dnspython==1.16.0
 eventlet==0.30.2
 Flask==2.0.1
 Flask-SocketIO==5.1.0
