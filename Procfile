@@ -1,1 +1,2 @@
-web: gunicorn --worker-class eventlet -w 1 app:app --log-file -
+# Modify this Procfile to fit your needs
+web: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 server:app
